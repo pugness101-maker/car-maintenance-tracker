@@ -1,0 +1,1195 @@
+:root {
+  --bg: #f4efe7;
+  --bg-accent: #efe4d3;
+  --panel: rgba(255, 251, 245, 0.92);
+  --text: #1f2933;
+  --muted: #5f6c77;
+  --line: rgba(62, 76, 91, 0.14);
+  --primary: #0c6c67;
+  --primary-deep: #084946;
+  --warn: #b45309;
+  --danger: #b42318;
+  --success: #177245;
+  --shadow: 0 18px 40px rgba(30, 41, 59, 0.12);
+  --radius: 22px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(circle at top left, rgba(12, 108, 103, 0.16), transparent 24%),
+    radial-gradient(circle at top right, rgba(180, 83, 9, 0.18), transparent 28%),
+    linear-gradient(180deg, #f6f1e8 0%, #efe5d8 100%);
+}
+
+.app-shell {
+  width: min(1220px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 32px 0 48px;
+}
+
+.app-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 18px;
+  padding: 24px 28px;
+  border-radius: 28px;
+  background: rgba(255, 251, 245, 0.8);
+  backdrop-filter: blur(16px);
+}
+
+.app-topbar,
+.hero,
+.panel,
+.subpanel,
+.widget,
+.vehicle-card,
+.service-row,
+.timeline-item,
+.tire-card {
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 24px;
+  padding: 28px;
+  border-radius: 32px;
+  background: linear-gradient(145deg, rgba(255, 251, 245, 0.96), rgba(239, 228, 211, 0.84));
+}
+
+.eyebrow {
+  margin: 0 0 10px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--primary);
+}
+
+.hero h1,
+.section-heading h2,
+.subpanel h3,
+.vehicle-header h3,
+.service-builder-header h3 {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 700;
+}
+
+.hero h1 {
+  font-size: clamp(2.4rem, 4vw, 4rem);
+  line-height: 0.96;
+  max-width: 10ch;
+}
+
+.hero-copy {
+  max-width: 56ch;
+  color: var(--muted);
+  font-size: 1.02rem;
+  line-height: 1.6;
+}
+
+.hero-panel {
+  display: grid;
+  gap: 14px;
+  align-content: center;
+}
+
+.hero-stat,
+.widget {
+  padding: 18px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.68);
+}
+
+.hero-stat span,
+.widget span,
+.meta,
+.muted {
+  display: block;
+  color: var(--muted);
+}
+
+.hero-stat strong,
+.widget strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 1.2rem;
+}
+
+.tabbar {
+  display: inline-grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  padding: 8px;
+  border-radius: 999px;
+  background: rgba(12, 108, 103, 0.09);
+}
+
+.auth-panel {
+  display: grid;
+  gap: 10px;
+  min-width: 260px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.64);
+}
+
+.auth-panel strong {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.auth-form {
+  display: grid;
+  gap: 8px;
+}
+
+.auth-form input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 10px 12px;
+  font: inherit;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.tabbar-button {
+  border: none;
+  border-radius: 999px;
+  padding: 12px 18px;
+  min-width: 108px;
+  font: inherit;
+  font-weight: 700;
+  color: var(--primary-deep);
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+}
+
+.tabbar-button.is-active {
+  color: white;
+  background: linear-gradient(135deg, var(--primary), var(--primary-deep));
+  box-shadow: 0 10px 24px rgba(8, 73, 70, 0.2);
+}
+
+.screen-stack {
+  margin-top: 22px;
+}
+
+.app-screen {
+  display: none;
+  gap: 22px;
+}
+
+.app-screen.is-active {
+  display: grid;
+}
+
+.grid-two {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px;
+}
+
+.panel,
+.subpanel,
+.vehicle-card {
+  border-radius: var(--radius);
+  background: var(--panel);
+  backdrop-filter: blur(14px);
+}
+
+.panel,
+.subpanel {
+  padding: 22px;
+}
+
+.section-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.widget-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.dashboard-grid {
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+.widget strong {
+  font-size: 1.6rem;
+}
+
+.list-stack,
+.vehicle-list,
+.service-checklist,
+.timeline,
+.tire-grid,
+.recommendation-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.recommendation-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.recommendation-section-title {
+  grid-column: 1 / -1;
+  margin-top: 6px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--primary);
+}
+
+.recommendation-card {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.recommendation-card strong {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.empty-state {
+  color: var(--muted);
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+label,
+fieldset {
+  display: grid;
+  gap: 8px;
+  font-weight: 600;
+}
+
+input,
+textarea,
+select {
+  width: 100%;
+  border: 1px solid rgba(62, 76, 91, 0.16);
+  border-radius: 14px;
+  padding: 12px 14px;
+  font: inherit;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.88);
+}
+
+textarea {
+  resize: vertical;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: 2px solid rgba(12, 108, 103, 0.24);
+  border-color: rgba(12, 108, 103, 0.45);
+}
+
+.full-span {
+  grid-column: 1 / -1;
+}
+
+.button-primary,
+.button-secondary,
+.button-ghost {
+  border: none;
+  border-radius: 999px;
+  padding: 12px 18px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.16s ease, opacity 0.16s ease, background 0.16s ease;
+}
+
+.button-primary:hover,
+.button-secondary:hover,
+.button-ghost:hover {
+  transform: translateY(-1px);
+}
+
+.button-primary {
+  color: white;
+  background: linear-gradient(135deg, var(--primary), var(--primary-deep));
+}
+
+.history-toggle {
+  width: 100%;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.history-toolbar {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.history-top-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  margin-bottom: 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.button-secondary {
+  color: var(--primary-deep);
+  background: rgba(12, 108, 103, 0.12);
+}
+
+.button-secondary.is-active {
+  color: white;
+  background: linear-gradient(135deg, var(--primary), var(--primary-deep));
+}
+
+.button-ghost {
+  color: var(--danger);
+  background: rgba(180, 35, 24, 0.08);
+  width: fit-content;
+}
+
+.button-ghost-neutral {
+  color: var(--primary-deep);
+  background: rgba(62, 76, 91, 0.08);
+}
+
+.service-builder {
+  display: grid;
+  gap: 12px;
+}
+
+.custom-service-entry {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.custom-service-entry input {
+  flex: 1 1 260px;
+}
+
+.service-checklist {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.history-quick-checklist {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.check-card {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid rgba(62, 76, 91, 0.12);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.72);
+  font-weight: 600;
+}
+
+.check-card input {
+  width: auto;
+}
+
+.check-card-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.service-name-manager-body {
+  display: grid;
+  gap: 14px;
+}
+
+.service-name-card .meta {
+  margin-top: 4px;
+}
+
+.service-name-card.is-removed {
+  opacity: 0.68;
+  border-style: dashed;
+}
+
+.selected-service-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid rgba(62, 76, 91, 0.12);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.selected-service-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.reminder-editor {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.tire-service-panel {
+  border: 1px dashed rgba(12, 108, 103, 0.35);
+  border-radius: 18px;
+  padding: 16px;
+  background: rgba(12, 108, 103, 0.06);
+}
+
+.is-hidden {
+  display: none;
+}
+
+.service-builder-header,
+.vehicle-header,
+.vehicle-meta,
+.vehicle-summary,
+.inline-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.service-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.position-picker {
+  border: 1px solid rgba(62, 76, 91, 0.12);
+  border-radius: 18px;
+  padding: 12px 14px 16px;
+}
+
+.position-picker label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 14px;
+  font-weight: 500;
+}
+
+.position-picker input {
+  width: auto;
+}
+
+.vehicle-card {
+  padding: 18px;
+}
+
+.garage-fleet-panel .vehicle-list {
+  gap: 16px;
+}
+
+.garage-screen-panel .vehicle-list {
+  gap: 0;
+}
+
+.garage-vehicle-card {
+  display: grid;
+  gap: 18px;
+}
+
+.garage-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.garage-section {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.garage-header-block {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.78), rgba(239, 228, 211, 0.72));
+}
+
+.garage-section-full {
+  grid-column: 1 / -1;
+}
+
+.garage-car-layout {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(62, 76, 91, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.garage-car-heading {
+  text-align: center;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  color: var(--primary);
+}
+
+.garage-tire-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.garage-car-body {
+  height: 42px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(12, 108, 103, 0.14), rgba(180, 83, 9, 0.14));
+}
+
+.garage-tire-node {
+  border: 1px solid rgba(62, 76, 91, 0.12);
+  border-radius: 18px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--text);
+  cursor: pointer;
+  display: grid;
+  gap: 6px;
+  text-align: center;
+  font: inherit;
+}
+
+.garage-tire-node.is-active {
+  border-color: rgba(12, 108, 103, 0.45);
+  box-shadow: 0 12px 24px rgba(8, 73, 70, 0.12);
+}
+
+.garage-tire-node small {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.garage-inline-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.vehicle-meta {
+  margin: 10px 0 14px;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.status-due {
+  color: #7a2e0e;
+  background: rgba(180, 83, 9, 0.14);
+}
+
+.status-upcoming {
+  color: #155b75;
+  background: rgba(8, 73, 70, 0.12);
+}
+
+.status-ok {
+  color: var(--success);
+  background: rgba(23, 114, 69, 0.12);
+}
+
+.status-off {
+  color: var(--muted);
+  background: rgba(62, 76, 91, 0.1);
+}
+
+.status-setup {
+  color: var(--primary-deep);
+  background: rgba(12, 108, 103, 0.12);
+}
+
+.timeline-item,
+.tire-card {
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.timeline-item strong,
+.tire-card strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.garage-tire-card-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.tire-card-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.tire-card-actions .button-secondary {
+  padding: 10px 14px;
+}
+
+.progress-block {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.progress-track {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(12, 108, 103, 0.12);
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--primary), #d97706);
+}
+
+.vehicle-columns {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.schedule-card {
+  display: grid;
+  gap: 12px;
+}
+
+.schedule-toggle-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 26px;
+  font-weight: 700;
+}
+
+.dashboard-switcher {
+  min-width: 220px;
+}
+
+.view-toggle {
+  display: inline-flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.floating-action-button {
+  position: sticky;
+  bottom: 18px;
+  margin-top: 18px;
+  display: inline-flex;
+  width: fit-content;
+  box-shadow: 0 12px 28px rgba(8, 73, 70, 0.22);
+}
+
+.floating-action-row {
+  position: sticky;
+  bottom: 18px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.receipt-link {
+  text-decoration: none;
+  width: fit-content;
+}
+
+.schedule-toggle-row input {
+  width: auto;
+}
+
+.schedule-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.schedule-card-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.schedule-status-group {
+  border: 1px solid rgba(62, 76, 91, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.5);
+  padding: 10px 12px;
+}
+
+.schedule-section-dropdown {
+  display: grid;
+  gap: 14px;
+}
+
+.schedule-section-summary {
+  cursor: pointer;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  list-style: none;
+}
+
+.schedule-section-summary::-webkit-details-marker {
+  display: none;
+}
+
+.schedule-status-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  font-weight: 700;
+  list-style: none;
+}
+
+.schedule-status-summary::-webkit-details-marker {
+  display: none;
+}
+
+.schedule-status-group[open] .schedule-status-summary {
+  margin-bottom: 12px;
+}
+
+.timeline-compact-item {
+  display: grid;
+  grid-template-columns: 14px 1fr;
+  gap: 12px;
+  align-items: start;
+}
+
+.timeline-dot {
+  width: 14px;
+  height: 14px;
+  margin-top: 4px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--primary), #d97706);
+}
+
+.timeline-group {
+  display: grid;
+  gap: 12px;
+}
+
+.timeline-group h3 {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+.timeline-vertical {
+  display: grid;
+  gap: 16px;
+}
+
+.timeline-event {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.timeline-event-marker {
+  width: 18px;
+  height: 18px;
+  margin-top: 6px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--primary), #d97706);
+  box-shadow: 0 0 0 6px rgba(12, 108, 103, 0.08);
+}
+
+.timeline-event-card {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid rgba(62, 76, 91, 0.12);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.history-card-details {
+  margin-top: 10px;
+  border-top: 1px solid rgba(62, 76, 91, 0.12);
+  padding-top: 10px;
+}
+
+.history-card-details summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--primary-deep);
+  list-style: none;
+}
+
+.history-card-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.history-card-details[open] summary {
+  margin-bottom: 10px;
+}
+
+@media (max-width: 980px) {
+  .hero,
+  .grid-two,
+  .vehicle-columns,
+  .garage-grid,
+  .garage-inline-form,
+  .widget-grid,
+  .recommendation-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .garage-tire-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .history-top-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .app-topbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+@media (max-width: 720px) {
+  .app-shell {
+    width: min(100% - 18px, 100%);
+    padding-top: 18px;
+  }
+
+  .panel,
+  .subpanel,
+  .app-topbar,
+  .hero {
+    padding: 18px;
+  }
+
+  .tabbar {
+    width: 100%;
+  }
+
+  .tabbar-button {
+    min-width: 0;
+  }
+
+  .form-grid,
+  .service-checklist,
+  .reminder-editor,
+  .schedule-meta-grid,
+  .history-toolbar,
+  .garage-tire-card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .history-quick-checklist {
+    grid-template-columns: 1fr;
+  }
+}
+/* iPhone safe area fix (prevents notch overlap) */
+body {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  overscroll-behavior: none;
+}
+.tabbar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: transparent;
+  padding: 0;
+}
+
+.tabbar-button {
+  width: 100%;
+  min-height: 56px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  text-align: left;
+  white-space: normal;
+  line-height: 1.25;
+}
+
+.tabbar-button.is-active {
+  transform: none;
+}
+.app-topbar .tabbar,
+.tabbar {
+  max-width: 100%;
+}
+
+/* Mobile nav fix */
+.tabbar {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+  background: transparent !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  align-items: stretch !important;
+}
+
+.tabbar-button {
+  display: block !important;
+  width: 100% !important;
+  min-height: 56px !important;
+  padding: 14px 16px !important;
+  border-radius: 18px !important;
+  text-align: left !important;
+  white-space: normal !important;
+  line-height: 1.25 !important;
+}
+
+.tabbar-button.is-active {
+  transform: none !important;
+}
+
+@media (max-width: 768px) {
+  .tabbar {
+    display: none !important;
+  }
+
+  .app-topbar {
+    padding-top: 18px !important;
+  }
+
+  .app-shell {
+    padding-top: max(env(safe-area-inset-top), 18px) !important;
+  }
+}
+@media (max-width: 768px) {
+  h1 {
+    margin-top: 12px !important;
+    line-height: 1.1 !important;
+    font-size: 2.1rem !important;
+  }
+
+  .eyebrow {
+    margin-top: 6px !important;
+    display: block;
+  }
+}
+@media (max-width: 768px) {
+  body {
+    padding-top: 0 !important;
+  }
+
+  .app-shell {
+    padding-top: calc(env(safe-area-inset-top) + 20px) !important;
+  }
+
+  .app-topbar {
+    padding-top: 0 !important;
+  }
+
+  .eyebrow {
+    display: none !important;
+  }
+
+  h1 {
+    margin-top: 0 !important;
+    font-size: 2.05rem !important;
+    line-height: 1.1 !important;
+  }
+}
+@media (max-width: 768px) {
+  .tabbar {
+    display: none !important;
+  }
+  .mobile-tabbar {
+    display: none;
+  }
+
+  @media (max-width: 768px) {
+    body {
+      padding-bottom: 90px !important;
+    }
+
+    .mobile-tabbar {
+      position: fixed;
+      left: 16px;
+      right: 16px;
+      bottom: calc(env(safe-area-inset-bottom) + 12px);
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      padding: 10px;
+      background: rgba(255, 251, 245, 0.95);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(12, 108, 103, 0.08);
+      border-radius: 22px;
+      box-shadow: 0 10px 30px rgba(26, 34, 56, 0.12);
+      z-index: 999;
+    }
+
+    .mobile-tab-button {
+      border: none;
+      background: transparent;
+      color: #285b57;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      min-height: 56px;
+      border-radius: 16px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      line-height: 1.1;
+      padding: 8px 4px;
+    }
+
+    .mobile-tab-button.is-active {
+      background: linear-gradient(135deg, #0c6c67, #0f8b84);
+      color: white;
+    }
+
+    .mobile-tab-icon {
+      font-size: 1.05rem;
+      line-height: 1;
+    }
+  }
+  .app-topbar {
+    display: block;
+    padding: 0 !important;
+    background: transparent !important;
+    border-radius: 0 !important;
+    backdrop-filter: none !important;
+    box-shadow: none !important;
+  }
+
+  .auth-panel {
+    margin-top: 16px;
+  }
+
+  .hero-copy {
+    font-size: 1rem;
+    line-height: 1.5;
+    margin-top: 12px;
+  }
+
+  h1 {
+    font-size: 2rem !important;
+    line-height: 1.08 !important;
+    margin: 0 !important;
+  }
+}
+/* ===== iPhone PERFECT TABBAR ===== */
+@media (max-width: 768px) {
+
+  .tabbar {
+    position: fixed;
+    bottom: calc(env(safe-area-inset-bottom) + 10px);
+    left: 12px;
+    right: 12px;
+
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+
+    padding: 8px;
+    border-radius: 22px;
+
+    background: rgba(255, 251, 245, 0.95);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  }
+
+  .tabbar-button {
+    width: 100%;
+    min-width: 0;
+
+    padding: 8px 4px;
+    font-size: 11px;
+    line-height: 1.1;
+    text-align: center;
+
+    border-radius: 16px;
+
+    white-space: normal;
+    overflow-wrap: break-word;
+  }
+
+  .tabbar-button.is-active {
+    background: linear-gradient(135deg, var(--primary), var(--primary-deep));
+    color: white;
+  }
+
+  /* Prevent content from being hidden behind tabs */
+  .app-shell {
+    padding-bottom: 120px;
+  }
+}

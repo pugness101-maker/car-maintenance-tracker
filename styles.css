@@ -32,7 +32,7 @@ body {
 .app-shell {
   width: min(1220px, calc(100% - 32px));
   margin: 0 auto;
-  padding: 32px 0 120px;
+  padding: 32px 0 120px; /* THIS is the fix */
 }
 
 .app-topbar {
@@ -972,56 +972,9 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
   overscroll-behavior: none;
 }
-.tabbar {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  background: transparent;
-  padding: 0;
-}
-
-.tabbar-button {
-  width: 100%;
-  min-height: 56px;
-  padding: 14px 16px;
-  border-radius: 18px;
-  text-align: left;
-  white-space: normal;
-  line-height: 1.25;
-}
-
-.tabbar-button.is-active {
-  transform: none;
-}
 .app-topbar .tabbar,
 .tabbar {
   max-width: 100%;
-}
-
-/* Mobile nav fix */
-.tabbar {
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 12px !important;
-  background: transparent !important;
-  padding: 0 !important;
-  border-radius: 0 !important;
-  align-items: stretch !important;
-}
-
-.tabbar-button {
-  display: block !important;
-  width: 100% !important;
-  min-height: 56px !important;
-  padding: 14px 16px !important;
-  border-radius: 18px !important;
-  text-align: left !important;
-  white-space: normal !important;
-  line-height: 1.25 !important;
-}
-
-.tabbar-button.is-active {
-  transform: none !important;
 }
 
 @media (max-width: 768px) {
@@ -1152,51 +1105,5 @@ body {
     font-size: 2rem !important;
     line-height: 1.08 !important;
     margin: 0 !important;
-  }
-}
-/* ===== iPhone PERFECT TABBAR ===== */
-@media (max-width: 768px) {
-
-  .tabbar {
-    position: fixed;
-    bottom: calc(env(safe-area-inset-bottom) + 10px);
-    left: 12px;
-    right: 12px;
-
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 6px;
-
-    padding: 8px;
-    border-radius: 22px;
-
-    background: rgba(255, 251, 245, 0.95);
-    backdrop-filter: blur(12px);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
-  }
-
-  .tabbar-button {
-    width: 100%;
-    min-width: 0;
-
-    padding: 8px 4px;
-    font-size: 11px;
-    line-height: 1.1;
-    text-align: center;
-
-    border-radius: 16px;
-
-    white-space: normal;
-    overflow-wrap: break-word;
-  }
-
-  .tabbar-button.is-active {
-    background: linear-gradient(135deg, var(--primary), var(--primary-deep));
-    color: white;
-  }
-
-  /* Prevent content from being hidden behind tabs */
-  .app-shell {
-    padding-bottom: 120px;
   }
 }

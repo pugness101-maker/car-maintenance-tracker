@@ -1,0 +1,25 @@
+{
+  "name": "Car Maintenance Tracker",
+  "short_name": "Car Tracker",
+  "description": "Track vehicles, service history, recurring maintenance, tires, and garage records.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f4efe7",
+  "theme_color": "#0c6c67",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

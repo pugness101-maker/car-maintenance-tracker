@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Car Maintenance Tracker">
+  <defs>
+    <linearGradient id="bg" x1="80" x2="432" y1="48" y2="464" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0c6c67"/>
+      <stop offset="1" stop-color="#084946"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="150" x2="365" y1="136" y2="332" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff8ea"/>
+      <stop offset="1" stop-color="#f1dfbf"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <path fill="url(#shine)" d="M142 257c10-38 28-74 43-98 8-13 22-21 37-21h68c16 0 30 8 38 22 14 24 32 60 42 97l22 12c14 8 23 23 23 39v54c0 12-10 22-22 22h-22c-8 23-30 39-56 39s-48-16-56-39H205c-8 23-30 39-56 39s-48-16-56-39H71c-12 0-22-10-22-22v-54c0-16 9-31 23-39l70-12Zm53-12h122c-8-25-21-50-30-67h-62c-9 17-22 42-30 67Zm-46 144a30 30 0 1 0 0-60 30 30 0 0 0 0 60Zm166 0a30 30 0 1 0 0-60 30 30 0 0 0 0 60Z"/>
+  <path fill="#f59e0b" d="M362 99a21 21 0 0 1 42 0v31h31a21 21 0 0 1 0 42h-31v31a21 21 0 0 1-42 0v-31h-31a21 21 0 0 1 0-42h31V99Z"/>
+</svg>

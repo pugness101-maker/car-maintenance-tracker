@@ -1,0 +1,12 @@
+{
+  "name": "car-maintenance-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "python3 -m http.server 3000",
+    "serve": "python3 -m http.server 3000"
+  },
+  "dependencies": {
+    "@capacitor/ios": "^8.3.1"
+  }
+}

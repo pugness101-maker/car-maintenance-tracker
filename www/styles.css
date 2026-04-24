@@ -32,7 +32,7 @@ body {
 .app-shell {
   width: min(1220px, calc(100% - 32px));
   margin: 0 auto;
-  padding: 32px 0 120px;
+  padding: 32px 0 48px;
 }
 
 .app-topbar {
@@ -128,6 +128,14 @@ body {
   font-size: 1.2rem;
 }
 
+.tabbar {
+  display: inline-grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  padding: 8px;
+  border-radius: 999px;
+  background: rgba(12, 108, 103, 0.09);
+}
 
 .auth-panel {
   display: grid;
@@ -159,44 +167,23 @@ body {
   background: rgba(255, 255, 255, 0.78);
 }
 
-.tabbar {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  justify-content: space-around;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 8px calc(env(safe-area-inset-bottom) + 10px);
-  background: rgba(255, 251, 245, 0.95);
-  backdrop-filter: blur(12px);
-  border-top: 1px solid rgba(0,0,0,0.05);
-  z-index: 1000;
-}
-
 .tabbar-button {
-  flex: 1;
   border: none;
-  background: none;
-  border-radius: 16px;
-  padding: 8px 6px;
-  min-width: 0;
+  border-radius: 999px;
+  padding: 12px 18px;
+  min-width: 108px;
   font: inherit;
   font-weight: 700;
-  font-size: 12px;
-  color: #6b7280;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
+  color: var(--primary-deep);
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
 }
 
 .tabbar-button.is-active {
-  color: #0f766e;
-  background: rgba(12, 108, 103, 0.1);
-  box-shadow: none;
+  color: white;
+  background: linear-gradient(135deg, var(--primary), var(--primary-deep));
+  box-shadow: 0 10px 24px rgba(8, 73, 70, 0.2);
 }
 
 .screen-stack {
@@ -951,7 +938,13 @@ select:focus {
     padding: 18px;
   }
 
+  .tabbar {
+    width: 100%;
+  }
 
+  .tabbar-button {
+    min-width: 0;
+  }
 
   .form-grid,
   .service-checklist,
@@ -964,239 +957,5 @@ select:focus {
 
   .history-quick-checklist {
     grid-template-columns: 1fr;
-  }
-}
-/* iPhone safe area fix (prevents notch overlap) */
-body {
-  padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
-  overscroll-behavior: none;
-}
-.tabbar {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  background: transparent;
-  padding: 0;
-}
-
-.tabbar-button {
-  width: 100%;
-  min-height: 56px;
-  padding: 14px 16px;
-  border-radius: 18px;
-  text-align: left;
-  white-space: normal;
-  line-height: 1.25;
-}
-
-.tabbar-button.is-active {
-  transform: none;
-}
-.app-topbar .tabbar,
-.tabbar {
-  max-width: 100%;
-}
-
-/* Mobile nav fix */
-.tabbar {
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 12px !important;
-  background: transparent !important;
-  padding: 0 !important;
-  border-radius: 0 !important;
-  align-items: stretch !important;
-}
-
-.tabbar-button {
-  display: block !important;
-  width: 100% !important;
-  min-height: 56px !important;
-  padding: 14px 16px !important;
-  border-radius: 18px !important;
-  text-align: left !important;
-  white-space: normal !important;
-  line-height: 1.25 !important;
-}
-
-.tabbar-button.is-active {
-  transform: none !important;
-}
-
-@media (max-width: 768px) {
-  .tabbar {
-    display: none !important;
-  }
-
-  .app-topbar {
-    padding-top: 18px !important;
-  }
-
-  .app-shell {
-    padding-top: max(env(safe-area-inset-top), 18px) !important;
-  }
-}
-@media (max-width: 768px) {
-  h1 {
-    margin-top: 12px !important;
-    line-height: 1.1 !important;
-    font-size: 2.1rem !important;
-  }
-
-  .eyebrow {
-    margin-top: 6px !important;
-    display: block;
-  }
-}
-@media (max-width: 768px) {
-  body {
-    padding-top: 0 !important;
-  }
-
-  .app-shell {
-    padding-top: calc(env(safe-area-inset-top) + 20px) !important;
-  }
-
-  .app-topbar {
-    padding-top: 0 !important;
-  }
-
-  .eyebrow {
-    display: none !important;
-  }
-
-  h1 {
-    margin-top: 0 !important;
-    font-size: 2.05rem !important;
-    line-height: 1.1 !important;
-  }
-}
-@media (max-width: 768px) {
-  .tabbar {
-    display: none !important;
-  }
-  .mobile-tabbar {
-    display: none;
-  }
-
-  @media (max-width: 768px) {
-    body {
-      padding-bottom: 90px !important;
-    }
-
-    .mobile-tabbar {
-      position: fixed;
-      left: 16px;
-      right: 16px;
-      bottom: calc(env(safe-area-inset-bottom) + 12px);
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 8px;
-      padding: 10px;
-      background: rgba(255, 251, 245, 0.95);
-      backdrop-filter: blur(16px);
-      border: 1px solid rgba(12, 108, 103, 0.08);
-      border-radius: 22px;
-      box-shadow: 0 10px 30px rgba(26, 34, 56, 0.12);
-      z-index: 999;
-    }
-
-    .mobile-tab-button {
-      border: none;
-      background: transparent;
-      color: #285b57;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 4px;
-      min-height: 56px;
-      border-radius: 16px;
-      font-size: 0.72rem;
-      font-weight: 700;
-      line-height: 1.1;
-      padding: 8px 4px;
-    }
-
-    .mobile-tab-button.is-active {
-      background: linear-gradient(135deg, #0c6c67, #0f8b84);
-      color: white;
-    }
-
-    .mobile-tab-icon {
-      font-size: 1.05rem;
-      line-height: 1;
-    }
-  }
-  .app-topbar {
-    display: block;
-    padding: 0 !important;
-    background: transparent !important;
-    border-radius: 0 !important;
-    backdrop-filter: none !important;
-    box-shadow: none !important;
-  }
-
-  .auth-panel {
-    margin-top: 16px;
-  }
-
-  .hero-copy {
-    font-size: 1rem;
-    line-height: 1.5;
-    margin-top: 12px;
-  }
-
-  h1 {
-    font-size: 2rem !important;
-    line-height: 1.08 !important;
-    margin: 0 !important;
-  }
-}
-/* ===== iPhone PERFECT TABBAR ===== */
-@media (max-width: 768px) {
-
-  .tabbar {
-    position: fixed;
-    bottom: calc(env(safe-area-inset-bottom) + 10px);
-    left: 12px;
-    right: 12px;
-
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 6px;
-
-    padding: 8px;
-    border-radius: 22px;
-
-    background: rgba(255, 251, 245, 0.95);
-    backdrop-filter: blur(12px);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
-  }
-
-  .tabbar-button {
-    width: 100%;
-    min-width: 0;
-
-    padding: 8px 4px;
-    font-size: 11px;
-    line-height: 1.1;
-    text-align: center;
-
-    border-radius: 16px;
-
-    white-space: normal;
-    overflow-wrap: break-word;
-  }
-
-  .tabbar-button.is-active {
-    background: linear-gradient(135deg, var(--primary), var(--primary-deep));
-    color: white;
-  }
-
-  /* Prevent content from being hidden behind tabs */
-  .app-shell {
-    padding-bottom: 120px;
   }
 }

@@ -12,9 +12,24 @@
     <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="icons/icon-maskable.svg" />
     <link rel="stylesheet" href="styles.css" />
-  </head>
-  <body>
-    <div class="app-shell">
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<section id="loginScreen" class="login-screen">
+  <div class="login-card">
+    <h1>Welcome</h1>
+    <p>Save your data or continue as guest</p>
+
+    <input type="email" placeholder="Email" />
+    <input type="password" placeholder="Password" />
+
+    <button id="guestBtn">Continue as guest</button>
+  </div>
+</section>
+
+<!-- MAIN APP -->
+<div id="appShell" class="app-shell is-hidden">
       <header class="app-topbar">
         <div>
           <p class="eyebrow">Car Maintenance Tracker</p>
@@ -699,5 +714,11 @@
         <span>Log</span>
       </button>
     </nav>
+    <script>
+ document.getElementById("guestBtn").addEventListener("click", () => {
+  document.getElementById("loginScreen").classList.add("is-hidden");
+  document.getElementById("appShell").classList.remove("is-hidden");
+});
+</script>
   </body>
 </html>

@@ -11,46 +11,26 @@
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="icons/icon-maskable.svg" />
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles.css?v=local-tools-v10" />
   </head>
   <body>
-
-  <!-- LOGIN SCREEN -->
-  <section id="loginScreen" class="login-screen">
-    <div class="login-card">
-      <h1>Welcome</h1>
-      <p>Save your data or continue as guest</p>
-
-      <input type="email" placeholder="Email" />
-      <input type="password" placeholder="Password" />
-
-      <button id="guestBtn">Continue as guest</button>
-    </div>
-  </section>
-
-  <!-- MAIN APP -->
-  <div id="appShell" class="app-shell is-hidden">
+    <div id="appShell" class="app-shell">
       <header class="app-topbar">
-        <div>
+        <div class="topbar-title">
           <p class="eyebrow">Car Maintenance Tracker</p>
-          <h1>Garage-ready maintenance tracking.</h1>
+          <h1>Car Maintenance</h1>
           <p class="hero-copy">
-            Move between app-style screens for your dashboard, garage, service schedule, and full
-            service history.
+            Dashboard, garage, schedule, and service history.
           </p>
         </div>
-    
-          <div id="authSignedIn" class="is-hidden">
-            <p class="eyebrow">Signed in</p>
-            <strong id="authUserEmail">Account</strong>
-            <div class="inline-row">
-              <button id="cloudSaveButton" class="button-secondary" type="button">Save cloud</button>
-              <button id="cloudLoadButton" class="button-secondary" type="button">Load cloud</button>
-              <button id="authSignOutButton" class="button-ghost" type="button">Log out</button>
-            </div>
-          </div>
+        <div class="topbar-actions" aria-label="Local data tools">
           <span id="authStatus" class="meta">Local mode</span>
-        </section>
+          <span id="saveStatus" class="save-status" aria-live="polite">Saved locally</span>
+          <button id="exportDataButton" class="button-secondary" type="button">Export Data</button>
+          <label class="button-secondary import-data-button" for="importDataInput">Import Data</label>
+          <input id="importDataInput" class="visually-hidden" type="file" accept="application/json,.json" />
+          <button id="resetDataButton" class="button-ghost danger-action" type="button">Reset Data</button>
+        </div>
         <nav class="tabbar" aria-label="Primary">
           <button class="tabbar-button is-active" type="button" data-screen-target="dashboard">
             Dashboard
@@ -59,10 +39,10 @@
             Garage
           </button>
           <button class="tabbar-button" type="button" data-screen-target="schedule">
-            Recurring Maintenance Plan
+            Plan
           </button>
           <button class="tabbar-button" type="button" data-screen-target="history">
-            Maintenance Log
+            Log
           </button>
         </nav>
       </header>
@@ -665,9 +645,20 @@
             <section id="historyQuickAddPanel" class="panel is-hidden">
               <div class="service-builder-header">
                 <h3>Quick Add Service</h3>
-                <span class="meta">Pick a common service to prefill the maintenance form.</span>
+                <span class="meta">Search a common service or type a custom one to prefill the maintenance form.</span>
               </div>
-              <div id="historyQuickServiceChecklist" class="service-checklist history-quick-checklist"></div>
+              <div class="quick-service-picker">
+                <label>
+                  Search or type service name
+                  <input
+                    id="historyQuickServiceSearchInput"
+                    type="text"
+                    autocomplete="off"
+                    placeholder="Oil change, brake pads, engine diagnostic..."
+                  />
+                </label>
+                <div id="historyQuickServiceChecklist" class="quick-service-results"></div>
+              </div>
             </section>
           </section>
 
@@ -691,19 +682,6 @@
 
     <datalist id="serviceTypeOptions"></datalist>
 
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="app.js"></script>
-      </div> <!-- appShell -->
-
-<script>
-  const guestBtn = document.getElementById("guestBtn");
-  const loginScreen = document.getElementById("loginScreen");
-  const appShell = document.getElementById("appShell");
-
-  guestBtn.addEventListener("click", () => {
-    loginScreen.style.display = "none";
-    appShell.classList.remove("is-hidden");
-  });
-</script>
+    <script src="app.js?v=local-tools-v10"></script>
   </body>
 </html>

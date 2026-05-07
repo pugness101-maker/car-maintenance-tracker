@@ -1,10 +1,12 @@
-const STORAGE_KEY = "car-maintenance-tracker-mvp";
-const LEGACY_STORAGE_KEYS = ["car-maintenance-tracker-mvp-v2"];
+const STORAGE_KEY = "car-maintenance-tracker-v2";
+const STORAGE_SCHEMA_VERSION = 2;
+const LEGACY_STORAGE_KEYS = [
+  "car-maintenance-tracker-mvp",
+  "car-maintenance-tracker-mvp-v2",
+  "car-maintenance-tracker-v1",
+];
 const CARFAX_IMPORT_KEY = "car-maintenance-tracker-carfax-master-import-2026-04-17";
-const SUPABASE_URL = "https://fbuwlhlepnnddcvdplzf.supabase.co";
-const SUPABASE_ANON_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZidXdsaGxlcG5uZGRjdmRwbHpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0NDMwMDIsImV4cCI6MjA5MjAxOTAwMn0.qGUNva0WrE7P0cFTLrG-AqFyDhbsd7xzC_WNtmZpex8";
-const CLOUD_SYNC_TABLE = "tracker_states";
+const TIRE_TRACKER_EXPANDED_KEY = "car-maintenance-tracker-tire-tracker-expanded";
 const SERVICE_LIBRARY = [
   {
     title: "Engine & Fluids",
@@ -415,19 +417,17 @@ const TIRE_POSITIONS = [
   { key: "rearRight", label: "Rear right" },
 ];
 const TREAD_DEPTH_OPTIONS = Array.from({ length: 13 }, (_, index) => 14 - index);
-const supabaseClient = window.supabase?.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) ?? null;
+let lastPersistedState = "";
+let saveStatusTimer = null;
+let isRestoringUiState = false;
 
 const state = loadState();
 
-const authForm = document.querySelector("#authForm");
-const authSignedOut = document.querySelector("#authSignedOut");
-const authSignedIn = document.querySelector("#authSignedIn");
-const authUserEmail = document.querySelector("#authUserEmail");
 const authStatus = document.querySelector("#authStatus");
-const authSignUpButton = document.querySelector("#authSignUpButton");
-const authSignOutButton = document.querySelector("#authSignOutButton");
-const cloudSaveButton = document.querySelector("#cloudSaveButton");
-const cloudLoadButton = document.querySelector("#cloudLoadButton");
+const saveStatus = document.querySelector("#saveStatus");
+const exportDataButton = document.querySelector("#exportDataButton");
+const importDataInput = document.querySelector("#importDataInput");
+const resetDataButton = document.querySelector("#resetDataButton");
 const vehicleForm = document.querySelector("#vehicleForm");
 const vehicleFormPanel = document.querySelector("#vehicleFormPanel");
 const vehicleFormToggleButton = document.querySelector("#vehicleFormToggleButton");
@@ -441,6 +441,7 @@ const recordServiceSearchInput = document.querySelector("#recordServiceSearchInp
 const recordCustomServiceInput = document.querySelector("#recordCustomServiceInput");
 const recordAddCustomServiceButton = document.querySelector("#recordAddCustomServiceButton");
 const historyQuickServiceChecklist = document.querySelector("#historyQuickServiceChecklist");
+const historyQuickServiceSearchInput = document.querySelector("#historyQuickServiceSearchInput");
 const serviceChecklist = document.querySelector("#serviceChecklist");
 const selectedServicesList = document.querySelector("#selectedServicesList");
 const customServiceInput = document.querySelector("#customServiceInput");
@@ -520,36 +521,21 @@ let isSchedulePlanExpanded = false;
 let activeDashboardVehicleId = "";
 let activeGarageVehicleId = "";
 let activeGarageTirePosition = "frontLeft";
-let activeHistoryView = "list";
-let authUser = null;
-let cloudSaveTimer = null;
-let isApplyingCloudState = false;
+let activeHistoryView = state.ui?.historyView || "list";
+let isTireTrackerExpanded =
+  state.ui?.tireTrackerExpanded ?? localStorage.getItem(TIRE_TRACKER_EXPANDED_KEY) === "true";
 
 const DEFAULT_TIRE_ROTATION_MILES = 5000;
 
 seedCarfaxData();
 seedDemoData();
-renderServiceTypeOptions();
-renderTreadDepthOptions();
-renderRecordServiceChecklist();
-renderHistoryQuickServiceChecklist();
-renderHistoryCategoryOptions();
-renderScheduleCategoryOptions();
-updateRecordFormMode();
-updateVehicleFormMode();
-updateTireEditMode();
-updateSchedulePlanMode();
+renderAllStaticOptions();
 bindEvents();
 render();
-initializeSupabaseAuth();
+initializeLocalStorageMode();
 registerServiceWorker();
 
 function bindEvents() {
-  authForm?.addEventListener("submit", handleAuthSignIn);
-  authSignUpButton?.addEventListener("click", handleAuthSignUp);
-  authSignOutButton?.addEventListener("click", handleAuthSignOut);
-  cloudSaveButton?.addEventListener("click", () => saveCloudState({ immediate: true }));
-  cloudLoadButton?.addEventListener("click", () => loadCloudState({ mergeWithLocal: false }));
   vehicleForm.addEventListener("submit", handleVehicleSubmit);
   tireEditForm.addEventListener("submit", handleTireEditSubmit);
   recordForm.addEventListener("submit", handleRecordSubmit);
@@ -580,22 +566,46 @@ function bindEvents() {
   scheduleVehicleSelect.addEventListener("change", handleScheduleVehicleChange);
   dashboardVehicleSelect.addEventListener("change", handleDashboardVehicleChange);
   garageVehicleSelect.addEventListener("change", handleGarageVehicleChange);
-  scheduleCategoryFilter.addEventListener("change", renderServiceSchedule);
-  scheduleStatusFilter.addEventListener("change", renderServiceSchedule);
+  scheduleCategoryFilter.addEventListener("change", () => {
+    renderServiceSchedule();
+    persistUiState();
+  });
+  scheduleStatusFilter.addEventListener("change", () => {
+    renderServiceSchedule();
+    persistUiState();
+  });
   scheduleScreen.addEventListener("click", handleScheduleScreenClick);
   recordCustomServiceInput.addEventListener("input", handleRecordCustomServiceInput);
   recordAddCustomServiceButton.addEventListener("click", handleRecordAddCustomService);
   recordServiceSearchInput.addEventListener("input", renderRecordServiceChecklist);
   recordCategorySelect.addEventListener("change", handleRecordCategoryChange);
   recordForm.elements.recordTirePosition.addEventListener("change", syncRecordTirePositionMode);
-  historySearchInput.addEventListener("input", renderHistory);
+  historySearchInput.addEventListener("input", () => {
+    renderHistory();
+    persistUiState();
+  });
   if (historyVehicleFilter) {
-    historyVehicleFilter.addEventListener("change", handleHistoryVehicleChange);
+    historyVehicleFilter.addEventListener("change", () => {
+      handleHistoryVehicleChange();
+      persistUiState();
+    });
   }
-  historyCategoryFilter.addEventListener("change", renderHistory);
-  historyDateFrom.addEventListener("change", renderHistory);
-  historyDateTo.addEventListener("change", renderHistory);
-  historySortSelect.addEventListener("change", renderHistory);
+  historyCategoryFilter.addEventListener("change", () => {
+    renderHistory();
+    persistUiState();
+  });
+  historyDateFrom.addEventListener("change", () => {
+    renderHistory();
+    persistUiState();
+  });
+  historyDateTo.addEventListener("change", () => {
+    renderHistory();
+    persistUiState();
+  });
+  historySortSelect.addEventListener("change", () => {
+    renderHistory();
+    persistUiState();
+  });
   screenButtons.forEach((button) =>
     button.addEventListener("click", () => handleScreenButtonClick(button.dataset.screenTarget))
   );
@@ -626,11 +636,18 @@ function bindEvents() {
     selectedServicesList.addEventListener("click", handleSelectedServicesClick);
   }
   if (historyQuickServiceChecklist) {
-    historyQuickServiceChecklist.addEventListener("change", handleHistoryQuickServiceChange);
+    historyQuickServiceChecklist.addEventListener("click", handleHistoryQuickServicePick);
+  }
+  if (historyQuickServiceSearchInput) {
+    historyQuickServiceSearchInput.addEventListener("input", renderHistoryQuickServiceChecklist);
+    historyQuickServiceSearchInput.addEventListener("keydown", handleHistoryQuickServiceSearchKeydown);
   }
   if (recordServiceChecklist) {
     recordServiceChecklist.addEventListener("change", handleRecordServiceChecklistChange);
   }
+  exportDataButton?.addEventListener("click", handleExportData);
+  importDataInput?.addEventListener("change", handleImportData);
+  resetDataButton?.addEventListener("click", handleResetData);
 }
 
 function registerServiceWorker() {
@@ -639,111 +656,23 @@ function registerServiceWorker() {
   }
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/service-worker.js").catch(() => {
-      // The app still works normally if install/offline support is unavailable.
-    });
+    navigator.serviceWorker
+      .register(`/service-worker.js?v=${Date.now()}`)
+      .then((registration) => registration.update())
+      .catch(() => {
+        // The app still works normally if install/offline support is unavailable.
+      });
   });
 }
 
-async function initializeSupabaseAuth() {
-  if (!supabaseClient) {
-    setAuthStatus("Supabase not loaded. Check your internet connection.");
-    return;
-  }
-
-  const { data, error } = await supabaseClient.auth.getSession();
-  if (error) {
-    setAuthStatus(`Auth check failed: ${formatSupabaseError(error)}`);
-    return;
-  }
-
-  authUser = data.session?.user ?? null;
+function initializeLocalStorageMode() {
   updateAuthUi();
-  if (authUser) {
-    await loadCloudState({ mergeWithLocal: true, silent: true });
-  }
-
-  supabaseClient.auth.onAuthStateChange(async (_event, session) => {
-    authUser = session?.user ?? null;
-    updateAuthUi();
-    if (authUser) {
-      await loadCloudState({ mergeWithLocal: true, silent: true });
-    }
-  });
-}
-
-async function handleAuthSignIn(event) {
-  event.preventDefault();
-  if (!supabaseClient) {
-    setAuthStatus("Supabase is not ready yet.");
-    return;
-  }
-
-  const formData = new FormData(authForm);
-  const email = cleanText(formData.get("email"));
-  const password = String(formData.get("password") ?? "");
-  setAuthStatus("Signing in...");
-  const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-  if (error) {
-    setAuthStatus(formatSupabaseError(error));
-    return;
-  }
-
-  authUser = data.user;
-  updateAuthUi();
-  await loadCloudState({ mergeWithLocal: true, silent: true });
-  setAuthStatus("Signed in. Cloud sync ready.");
-}
-
-async function handleAuthSignUp() {
-  if (!supabaseClient || !authForm) {
-    setAuthStatus("Supabase is not ready yet.");
-    return;
-  }
-
-  const formData = new FormData(authForm);
-  const email = cleanText(formData.get("email"));
-  const password = String(formData.get("password") ?? "");
-  if (!email || !password) {
-    setAuthStatus("Enter email and password first.");
-    return;
-  }
-
-  setAuthStatus("Creating account...");
-  const { data, error } = await supabaseClient.auth.signUp({ email, password });
-  if (error) {
-    setAuthStatus(formatSupabaseError(error));
-    return;
-  }
-
-  authUser = data.user ?? null;
-  updateAuthUi();
-  if (authUser) {
-    await saveCloudState({ immediate: true });
-  }
-  setAuthStatus("Account created. Check email confirmation if Supabase asks for it.");
-}
-
-async function handleAuthSignOut() {
-  if (!supabaseClient) {
-    return;
-  }
-
-  await supabaseClient.auth.signOut();
-  authUser = null;
-  updateAuthUi();
-  setAuthStatus("Signed out. Local data still stays in this browser.");
+  setAuthStatus("Local autosave on");
+  showSaveStatus("Saved locally", { hold: 900 });
 }
 
 function updateAuthUi() {
-  authSignedOut?.classList.toggle("is-hidden", Boolean(authUser));
-  authSignedIn?.classList.toggle("is-hidden", !authUser);
-  if (authUserEmail) {
-    authUserEmail.textContent = authUser?.email || "Signed in";
-  }
-  if (!authUser) {
-    setAuthStatus("Local mode");
-  }
+  setAuthStatus("Local autosave on");
 }
 
 function setAuthStatus(message) {
@@ -752,116 +681,112 @@ function setAuthStatus(message) {
   }
 }
 
-function formatSupabaseError(error) {
-  const message = error?.message || String(error || "Unknown Supabase error");
-  if (/failed to fetch|networkerror|load failed/i.test(message)) {
-    return "Could not reach Supabase. Check internet, Supabase project URL, and Auth URL settings.";
-  }
-  return message;
+function handleExportData() {
+  persist({ silent: true });
+  const exportPayload = {
+    app: "car-maintenance-tracker",
+    storageKey: STORAGE_KEY,
+    exportedAt: new Date().toISOString(),
+    state,
+  };
+  const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  const dateStamp = new Date().toISOString().slice(0, 10);
+  link.href = url;
+  link.download = `car-maintenance-tracker-backup-${dateStamp}.json`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  showSaveStatus("Exported", { hold: 1600 });
 }
 
-function getCloudStatePayload() {
-  return JSON.parse(
-    JSON.stringify({
-      vehicles: state.vehicles,
-      records: state.records,
-      customServiceTypes: state.customServiceTypes,
-      recurringPlans: state.recurringPlans,
-      hiddenServiceTypes: state.hiddenServiceTypes,
-      serviceDefinitions: state.serviceDefinitions,
-    })
+async function handleImportData(event) {
+  const file = event.target.files?.[0];
+  if (!file) {
+    return;
+  }
+
+  try {
+    const text = await file.text();
+    const parsedJson = JSON.parse(text);
+    const importedState = parseStoredState(JSON.stringify(parsedJson.state ?? parsedJson));
+    if (!importedState) {
+      throw new Error("Backup file did not contain readable tracker data.");
+    }
+
+    const confirmed = window.confirm(
+      "Import this backup and replace the current local data in this browser? This cannot be undone unless you export the current data first."
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    applyImportedState(importedState);
+    persist();
+    renderAllStaticOptions();
+    render();
+    showSaveStatus("Imported", { hold: 1800 });
+  } catch (error) {
+    console.error("Could not import car maintenance tracker backup", error);
+    window.alert("That backup file could not be imported. Please choose a valid tracker JSON export.");
+    showSaveStatus("Import failed", { isError: true, hold: 2400 });
+  } finally {
+    event.target.value = "";
+  }
+}
+
+function handleResetData() {
+  const confirmed = window.confirm(
+    "Reset all local car maintenance tracker data in this browser? This removes vehicles, tires, service history, custom services, recurring plans, and saved UI state."
   );
-}
-
-async function saveCloudState({ immediate = false } = {}) {
-  if (!supabaseClient || !authUser || isApplyingCloudState) {
+  if (!confirmed) {
     return;
   }
 
-  if (immediate) {
-    setAuthStatus("Saving to cloud...");
-  }
+  localStorage.removeItem(STORAGE_KEY);
+  LEGACY_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
+  localStorage.removeItem(CARFAX_IMPORT_KEY);
+  localStorage.removeItem(TIRE_TRACKER_EXPANDED_KEY);
+  window.location.reload();
+}
 
-  const { error } = await supabaseClient.from(CLOUD_SYNC_TABLE).upsert(
-    {
-      user_id: authUser.id,
-      state: getCloudStatePayload(),
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "user_id" }
+function applyImportedState(importedState) {
+  const normalizedState = mergeStoredState(createEmptyState(), importedState);
+  normalizedState.vehicles = normalizedState.vehicles.map(normalizeVehicleTireData);
+  normalizedState.serviceDefinitions = normalizeServiceDefinitions(normalizedState.serviceDefinitions || []);
+  normalizedState.customServiceTypes = mergeUniqueText(
+    normalizedState.customServiceTypes || [],
+    normalizedState.serviceDefinitions
+      .filter((serviceDefinition) => !serviceDefinition.baseName)
+      .map((serviceDefinition) => serviceDefinition.name)
   );
+  normalizedState.ui = normalizeUiState(normalizedState.ui);
 
-  if (error) {
-    setAuthStatus(`Cloud save failed. ${formatSupabaseError(error)}`);
-    return;
-  }
-
-  setAuthStatus("Cloud saved.");
+  state.schemaVersion = STORAGE_SCHEMA_VERSION;
+  state.updatedAt = normalizedState.updatedAt ?? new Date().toISOString();
+  state.vehicles = normalizedState.vehicles;
+  state.records = normalizedState.records;
+  state.customServiceTypes = normalizedState.customServiceTypes;
+  state.recurringPlans = normalizedState.recurringPlans;
+  state.hiddenServiceTypes = normalizedState.hiddenServiceTypes;
+  state.serviceDefinitions = normalizedState.serviceDefinitions;
+  state.ui = normalizedState.ui;
 }
 
-function queueCloudSave() {
-  if (!authUser || isApplyingCloudState) {
-    return;
-  }
-
-  clearTimeout(cloudSaveTimer);
-  cloudSaveTimer = setTimeout(() => {
-    saveCloudState();
-  }, 900);
-}
-
-async function loadCloudState({ mergeWithLocal = true, silent = false } = {}) {
-  if (!supabaseClient || !authUser) {
-    return;
-  }
-
-  if (!silent) {
-    setAuthStatus("Loading cloud data...");
-  }
-
-  const { data, error } = await supabaseClient
-    .from(CLOUD_SYNC_TABLE)
-    .select("state")
-    .eq("user_id", authUser.id)
-    .maybeSingle();
-
-  if (error) {
-    setAuthStatus(`Cloud load failed. ${formatSupabaseError(error)}`);
-    return;
-  }
-
-  if (!data?.state) {
-    await saveCloudState({ immediate: true });
-    return;
-  }
-
-  applyCloudState(data.state, { mergeWithLocal });
-  setAuthStatus("Cloud data loaded.");
-}
-
-function applyCloudState(cloudState, { mergeWithLocal = true } = {}) {
-  const parsedCloudState = parseStoredState(JSON.stringify(cloudState));
-  if (!parsedCloudState) {
-    setAuthStatus("Cloud data could not be read.");
-    return;
-  }
-
-  isApplyingCloudState = true;
-  const nextState = mergeWithLocal ? mergeStoredState(state, parsedCloudState) : parsedCloudState;
-  state.vehicles = nextState.vehicles.map(normalizeVehicleTireData);
-  state.records = nextState.records;
-  state.customServiceTypes = nextState.customServiceTypes;
-  state.recurringPlans = nextState.recurringPlans;
-  state.hiddenServiceTypes = nextState.hiddenServiceTypes;
-  state.serviceDefinitions = normalizeServiceDefinitions(nextState.serviceDefinitions || []);
-  persist();
-  isApplyingCloudState = false;
+function renderAllStaticOptions() {
   renderServiceTypeOptions();
+  renderTreadDepthOptions();
   renderRecordServiceChecklist();
   renderHistoryQuickServiceChecklist();
   renderHistoryCategoryOptions();
   renderScheduleCategoryOptions();
-  render();
+  restoreUiStateControls();
+  updateRecordFormMode();
+  updateVehicleFormMode();
+  updateTireEditMode();
+  updateSchedulePlanMode();
 }
 
 function handleVehicleSubmit(event) {
@@ -1051,28 +976,46 @@ function handleRecordAddCustomService() {
   handleRecordServiceTypeChange();
 }
 
-function handleHistoryQuickServiceChange(event) {
-  if (event.target.name !== "historyQuickService") {
+function handleHistoryQuickServicePick(event) {
+  const pickButton = event.target.closest("[data-quick-service]");
+  if (!pickButton) {
     return;
   }
 
-  historyQuickServiceChecklist
-    .querySelectorAll('input[name="historyQuickService"]')
-    .forEach((input) => {
-      if (input !== event.target) {
-        input.checked = false;
-      }
-    });
+  applyHistoryQuickService(pickButton.dataset.quickService);
+}
 
-  const serviceType = event.target.checked ? cleanText(event.target.value) : "";
-  recordForm.elements.serviceType.value = serviceType;
-  if (serviceType) {
-    setRecordCategoryValue(getAutoServiceCategory(serviceType));
-    setRecordFormExpanded(true);
-    setHistoryQuickAddExpanded(false);
+function handleHistoryQuickServiceSearchKeydown(event) {
+  if (event.key !== "Enter") {
+    return;
   }
-  syncRecordTireSection();
+
+  event.preventDefault();
+  applyHistoryQuickService(historyQuickServiceSearchInput.value);
+}
+
+function applyHistoryQuickService(serviceType) {
+  const normalized = cleanText(serviceType);
+  if (!normalized) {
+    return;
+  }
+
+  const canonicalService = getCanonicalServiceType(normalized);
+  registerCustomServiceType(canonicalService);
+  renderServiceTypeOptions();
+  renderHistoryCategoryOptions();
+  renderScheduleCategoryOptions();
+  recordCustomServiceInput.value = canonicalService;
+  recordForm.elements.serviceType.value = canonicalService;
+  setRecordCategoryValue(getAutoServiceCategory(canonicalService));
+  renderRecordServiceChecklist();
   renderHistoryQuickServiceChecklist();
+  setRecordFormExpanded(true);
+  setHistoryQuickAddExpanded(false);
+  syncRecordTireSection();
+  if (historyQuickServiceSearchInput) {
+    historyQuickServiceSearchInput.value = "";
+  }
 }
 
 function syncRecordTirePositionMode() {
@@ -1170,6 +1113,14 @@ function handleSchedulePlanSubmit(event) {
 }
 
 function handleVehicleListClick(event) {
+  const tireTrackerToggle = event.target.closest("[data-toggle-tire-tracker]");
+  if (tireTrackerToggle) {
+    isTireTrackerExpanded = !isTireTrackerExpanded;
+    persistUiState();
+    renderVehicles();
+    return;
+  }
+
   if (event.target.closest("[data-add-vehicle]")) {
     resetVehicleFormMode();
     setActiveScreen("dashboard");
@@ -1844,12 +1795,20 @@ function handleSelectedServicesClick(event) {
 }
 
 function readSelectedServices() {
+  if (!serviceChecklist) {
+    return [];
+  }
+
   return [...serviceChecklist.querySelectorAll('input[name="serviceTypes"]:checked')].map((input) => ({
     serviceType: input.value,
   }));
 }
 
 function renderServiceChecklist() {
+  if (!serviceChecklist) {
+    return;
+  }
+
   const selectedValues = new Set(
     [...serviceChecklist.querySelectorAll('input[name="serviceTypes"]:checked')].map((input) => input.value)
   );
@@ -1885,6 +1844,10 @@ function renderServiceChecklist() {
 }
 
 function clearServiceChecks() {
+  if (!serviceChecklist) {
+    return;
+  }
+
   serviceChecklist.querySelectorAll('input[name="serviceTypes"]').forEach((input) => {
     input.checked = false;
   });
@@ -1900,6 +1863,13 @@ function checkServiceType(serviceType) {
   registerCustomServiceType(normalized);
   renderServiceTypeOptions();
   renderServiceChecklist();
+  if (!serviceChecklist) {
+    recordCustomServiceInput.value = normalized;
+    renderRecordServiceChecklist();
+    handleRecordServiceTypeChange();
+    return;
+  }
+
   const checkbox = [...serviceChecklist.querySelectorAll('input[name="serviceTypes"]')].find(
     (input) => input.value.toLowerCase() === normalized.toLowerCase()
   );
@@ -1911,18 +1881,31 @@ function checkServiceType(serviceType) {
 }
 
 function checkServiceTypes(serviceTypes) {
-  clearServiceChecks();
-  serviceTypes.forEach((serviceType) => {
-    const normalized = cleanText(serviceType);
-    if (!normalized) {
-      return;
-    }
+  const normalizedServices = mergeUniqueText(
+    [],
+    serviceTypes.map((serviceType) => getCanonicalServiceType(serviceType)).filter(Boolean)
+  );
 
-    registerCustomServiceType(normalized);
-  });
+  if (!serviceChecklist) {
+    normalizedServices.forEach((serviceType) => registerCustomServiceType(serviceType));
+    renderServiceTypeOptions();
+    recordCustomServiceInput.value = "";
+    renderRecordServiceChecklist();
+    const selectedKeys = new Set(normalizedServices.map((serviceType) => serviceType.toLowerCase()));
+    recordServiceChecklist?.querySelectorAll('input[name="recordServiceType"]').forEach((input) => {
+      input.checked = selectedKeys.has(input.value.toLowerCase());
+    });
+    recordForm.elements.serviceType.value = normalizedServices[0] ?? "";
+    syncRecordTireSection();
+    renderHistoryQuickServiceChecklist();
+    return;
+  }
+
+  clearServiceChecks();
+  normalizedServices.forEach((serviceType) => registerCustomServiceType(serviceType));
   renderServiceTypeOptions();
   renderServiceChecklist();
-  const selectedKeys = new Set(serviceTypes.map((serviceType) => cleanText(serviceType).toLowerCase()).filter(Boolean));
+  const selectedKeys = new Set(normalizedServices.map((serviceType) => serviceType.toLowerCase()));
   serviceChecklist.querySelectorAll('input[name="serviceTypes"]').forEach((input) => {
     input.checked = selectedKeys.has(input.value.toLowerCase());
   });
@@ -1974,6 +1957,10 @@ function getLatestTrackedRecords(records = state.records) {
 }
 
 function renderSelectedServices() {
+  if (!selectedServicesList) {
+    return;
+  }
+
   const selectedServices = readSelectedServices().map((entry) => entry.serviceType);
   selectedServicesList.innerHTML = selectedServices.length
     ? selectedServices
@@ -2032,11 +2019,13 @@ function deleteCustomService(serviceType) {
   state.customServiceTypes = state.customServiceTypes.filter(
     (customType) => customType.toLowerCase() !== normalized.toLowerCase()
   );
-  const checkbox = [...serviceChecklist.querySelectorAll('input[name="serviceTypes"]')].find(
-    (input) => input.value.toLowerCase() === normalized.toLowerCase()
-  );
-  if (checkbox) {
-    checkbox.checked = false;
+  if (serviceChecklist) {
+    const checkbox = [...serviceChecklist.querySelectorAll('input[name="serviceTypes"]')].find(
+      (input) => input.value.toLowerCase() === normalized.toLowerCase()
+    );
+    if (checkbox) {
+      checkbox.checked = false;
+    }
   }
   if (editingCustomServiceName && editingCustomServiceName.toLowerCase() === normalized.toLowerCase()) {
     editingCustomServiceName = null;
@@ -2186,29 +2175,69 @@ function renderHistoryCategoryOptions() {
   }
 }
 
+function getHistoryQuickPreferredServices() {
+  return [
+    "Oil change",
+    "Tire rotation",
+    "Brake inspection",
+    "Vehicle inspection",
+    "Tire pressure check",
+    "Air filter replacement",
+    "Cabin air filter replacement",
+    "Brake pads",
+    "Battery replacement",
+    "Alignment",
+    "Coolant flush",
+    "Transmission fluid",
+    "Spark plugs",
+    "Wiper blades",
+    "Engine diagnostic",
+  ];
+}
+
+function getHistoryQuickServiceSuggestions() {
+  return mergeUniqueText(getHistoryQuickPreferredServices(), getAvailableServiceTypes());
+}
+
+function getHistoryQuickServiceMatches(query) {
+  const normalizedQuery = cleanText(query).toLowerCase();
+  const suggestions = getHistoryQuickServiceSuggestions();
+  if (!normalizedQuery) {
+    const preferredSet = new Set(getHistoryQuickPreferredServices().map((serviceType) => serviceType.toLowerCase()));
+    return suggestions.filter((serviceType) => preferredSet.has(serviceType.toLowerCase())).slice(0, 15);
+  }
+
+  return suggestions
+    .filter((serviceType) => serviceType.toLowerCase().includes(normalizedQuery))
+    .sort((a, b) => a.localeCompare(b))
+    .slice(0, 12);
+}
+
 function renderHistoryQuickServiceChecklist() {
   if (!historyQuickServiceChecklist) {
     return;
   }
 
-  const quickServices = ["Oil change", "Tire rotation", "Brake inspection", "Vehicle inspection"];
-  const selectedService = cleanText(recordForm?.elements?.serviceType?.value).toLowerCase();
+  const query = cleanText(historyQuickServiceSearchInput?.value);
+  const selectedService = cleanText(recordForm?.elements?.serviceType?.value);
+  const matches = getHistoryQuickServiceMatches(query);
+  const hasExactMatch = matches.some((serviceType) => serviceType.toLowerCase() === query.toLowerCase());
+  const options = mergeUniqueText(matches, query && !hasExactMatch ? [query] : []);
 
-  historyQuickServiceChecklist.innerHTML = quickServices
-    .map(
-      (serviceType) => `
-        <label class="check-card">
-          <input
-            type="checkbox"
-            name="historyQuickService"
-            value="${serviceType}"
-            ${selectedService === serviceType.toLowerCase() ? "checked" : ""}
-          />
-          <span>${serviceType}</span>
-        </label>
-      `
-    )
-    .join("");
+  historyQuickServiceChecklist.innerHTML = options.length
+    ? options
+        .map((serviceType) => {
+          const isCustom = query && serviceType.toLowerCase() === query.toLowerCase() && !hasExactMatch;
+          const isSelected = selectedService.toLowerCase() === serviceType.toLowerCase();
+          return `
+            <button class="quick-service-option ${isSelected ? "is-active" : ""}" type="button" data-quick-service="${serviceType}">
+              <strong>${isCustom ? `Use "${serviceType}"` : serviceType}</strong>
+              <span class="meta">${isCustom ? "Custom service" : getAutoServiceCategory(serviceType)}</span>
+            </button>
+          `;
+        })
+        .join("")
+    : `<p class="muted">No matches. Type a service name and press Enter to use it.</p>`;
 }
 
 function renderRecordServiceChecklist() {
@@ -3016,6 +3045,7 @@ function renderVehicles() {
       .sort(sortRecurringPlanSummaries);
     const nextDue = [...recordSummaries, ...recurringSummaries].filter(Boolean).sort(sortByUrgency)[0] ?? null;
     const tires = TIRE_POSITIONS.map((position) => vehicle.tires?.[position.key] ?? null);
+    const trackedTireCount = tires.filter(Boolean).length;
     const costMetrics = buildDashboardCostMetrics(vehicle, records);
     const lifetimeStats = buildGarageLifetimeStats(vehicle, records, tires, costMetrics);
     const garageDocuments = buildGarageDocuments(records);
@@ -3062,54 +3092,62 @@ function renderVehicles() {
       </div>
 
       <div class="garage-grid">
-  <section class="garage-section tire-tracker-section">
-          <div class="vehicle-summary">
-           <div class="tire-visual-tracker">
-  <div class="tire-row">
-    ${tireCardMarkup(vehicle, vehicle.tires?.frontLeft, TIRE_POSITIONS[0])}
-    ${tireCardMarkup(vehicle, vehicle.tires?.frontRight, TIRE_POSITIONS[1])}
-  </div>
-
-  <div class="car-body-pill">Vehicle</div>
-
-  <div class="tire-row">
-    ${tireCardMarkup(vehicle, vehicle.tires?.rearLeft, TIRE_POSITIONS[2])}
-    ${tireCardMarkup(vehicle, vehicle.tires?.rearRight, TIRE_POSITIONS[3])}
-  </div>
-</div>
-          <div class="timeline-item tire-history-panel">
-            <div class="vehicle-summary">
-              <div>
-                <strong>Tire History</strong>
-                <span class="meta">${tirePosition.label}</span>
-              </div>
-              <div class="inline-row">
-                <button class="button-secondary" type="button" data-view-tire-history="${tirePosition.key}">
-                  View tire history
-                </button>
-              </div>
+        <section class="garage-section tire-tracker-section ${isTireTrackerExpanded ? "is-expanded" : "is-collapsed"}">
+          <div class="tire-tracker-summary">
+            <div>
+              <strong>Tire Tracker</strong>
+              <span class="meta">${trackedTireCount} tires tracked • Front/rear layout</span>
             </div>
-            <span class="meta">Tire ID: ${selectedTire?.tireId || "Not saved"}</span>
-            <span class="meta">Position history: ${buildTirePositionHistoryLabel(selectedTire)}</span>
-            <span class="meta">Rotation history: ${buildTireRotationHistoryLabel(selectedTire, tireRotationHistory)}</span>
-            <span class="meta">Replacement history: ${buildTireReplacementHistoryLabel(vehicle, selectedTire)}</span>
-            <form class="garage-inline-form" data-garage-rotation-form="${vehicle.id}">
-              <input type="hidden" name="vehicleId" value="${vehicle.id}" />
-              <label>
-                Rotation type
-                <select name="rotationType">
-                  <option value="front-to-rear">Front to rear</option>
-                  <option value="rear-to-front">Rear to front</option>
-                  <option value="cross-rotation">Cross rotation</option>
-                </select>
-              </label>
-              <label>
-                Rotation notes
-                <input type="text" name="notes" placeholder="Optional notes" />
-              </label>
-              <button class="button-primary" type="submit">Log rotation</button>
-            </form>
+            <button class="button-secondary tire-tracker-toggle" type="button" data-toggle-tire-tracker aria-expanded="${isTireTrackerExpanded}">
+              <span>${isTireTrackerExpanded ? "Collapse" : "Expand"}</span>
+              <span aria-hidden="true">${isTireTrackerExpanded ? "⌃" : "⌄"}</span>
+            </button>
           </div>
+          ${
+            isTireTrackerExpanded
+              ? `
+                <div class="tire-grid garage-tire-grid">
+                  ${tireCardMarkup(vehicle, vehicle.tires?.frontLeft, TIRE_POSITIONS[0])}
+                  ${tireCardMarkup(vehicle, vehicle.tires?.frontRight, TIRE_POSITIONS[1])}
+                  ${tireCardMarkup(vehicle, vehicle.tires?.rearLeft, TIRE_POSITIONS[2])}
+                  ${tireCardMarkup(vehicle, vehicle.tires?.rearRight, TIRE_POSITIONS[3])}
+                </div>
+                <div class="timeline-item tire-history-panel">
+                  <div class="vehicle-summary">
+                    <div>
+                      <strong>Tire History</strong>
+                      <span class="meta">${tirePosition.label}</span>
+                    </div>
+                    <div class="inline-row">
+                      <button class="button-secondary" type="button" data-view-tire-history="${tirePosition.key}">
+                        View tire history
+                      </button>
+                    </div>
+                  </div>
+                  <span class="meta">Tire ID: ${selectedTire?.tireId || "Not saved"}</span>
+                  <span class="meta">Position history: ${buildTirePositionHistoryLabel(selectedTire)}</span>
+                  <span class="meta">Rotation history: ${buildTireRotationHistoryLabel(selectedTire, tireRotationHistory)}</span>
+                  <span class="meta">Replacement history: ${buildTireReplacementHistoryLabel(vehicle, selectedTire)}</span>
+                  <form class="garage-inline-form" data-garage-rotation-form="${vehicle.id}">
+                    <input type="hidden" name="vehicleId" value="${vehicle.id}" />
+                    <label>
+                      Rotation type
+                      <select name="rotationType">
+                        <option value="front-to-rear">Front to rear</option>
+                        <option value="rear-to-front">Rear to front</option>
+                        <option value="cross-rotation">Cross rotation</option>
+                      </select>
+                    </label>
+                    <label>
+                      Rotation notes
+                      <input type="text" name="notes" placeholder="Optional notes" />
+                    </label>
+                    <button class="button-primary" type="submit">Log rotation</button>
+                  </form>
+                </div>
+              `
+              : ""
+          }
         </section>
 
       
@@ -4014,6 +4052,8 @@ function setActiveScreen(screenName) {
   screenButtons.forEach((button) => {
     button.classList.toggle("is-active", button.dataset.screenTarget === screenName);
   });
+
+  persistUiState();
 }
 
 function loadRecordIntoForm(record) {
@@ -4085,6 +4125,7 @@ function setHistoryQuickAddExpanded(expanded) {
   isHistoryQuickAddExpanded = expanded;
   historyQuickAddPanel.classList.toggle("is-hidden", !expanded);
   historyQuickAddToggleButton.setAttribute("aria-expanded", String(expanded));
+  persistUiState();
 }
 
 function loadVehicleIntoForm(vehicle) {
@@ -4130,6 +4171,7 @@ function setVehicleFormExpanded(expanded) {
   isVehicleFormExpanded = expanded;
   vehicleFormPanel.classList.toggle("is-hidden", !expanded);
   vehicleFormToggleButton.setAttribute("aria-expanded", String(expanded));
+  persistUiState();
 }
 
 function loadTireIntoForm(vehicleId, position) {
@@ -4179,6 +4221,7 @@ function setRecordFormExpanded(expanded) {
   isRecordFormExpanded = expanded;
   recordFormPanel.classList.toggle("is-hidden", !expanded);
   recordFormToggleButton.setAttribute("aria-expanded", String(expanded));
+  persistUiState();
 }
 
 function buildServiceSummary(record) {
@@ -4251,18 +4294,26 @@ function buildServiceSummary(record) {
 function tireCardMarkup(vehicle, tire, position) {
   if (!tire) {
     return `
-      <div class="tire-card">
-        <strong>${position.label}</strong>
-        <span class="meta">No tire saved for this position.</span>
-        <div class="tire-card-actions">
-          <button class="button-secondary" type="button" data-replace-tire="${position.key}" data-vehicle-id="${vehicle.id}">
-            Replace tire
-          </button>
-          <button class="button-secondary" type="button" data-edit-tire="${position.key}" data-vehicle-id="${vehicle.id}">
-            Edit tire
-          </button>
+      <details class="tire-dropdown tire-card">
+        <summary class="tire-dropdown-summary">
+          <span>
+            <strong>${position.label}</strong>
+            <span class="meta">No tire saved</span>
+          </span>
+          <span class="status-pill status-setup">Setup</span>
+        </summary>
+        <div class="tire-dropdown-content">
+          <span class="meta">No tire saved for this position.</span>
+          <div class="tire-card-actions">
+            <button class="button-secondary" type="button" data-replace-tire="${position.key}" data-vehicle-id="${vehicle.id}">
+              Replace tire
+            </button>
+            <button class="button-secondary" type="button" data-edit-tire="${position.key}" data-vehicle-id="${vehicle.id}">
+              Edit tire
+            </button>
+          </div>
         </div>
-      </div>
+      </details>
     `;
   }
 
@@ -4278,67 +4329,81 @@ function tireCardMarkup(vehicle, tire, position) {
       ? Math.max(tire.estimatedReplacementMileage - tire.installMileage, 0)
       : null;
   const tireLifeProgress = buildProgressMeta(milesOnTire, totalEstimatedLife);
+  const tireName = [tire.brand, tire.model].filter(Boolean).join(" ") || "Brand/model not saved";
+  const treadDepth = formatTreadDepthValue(tire.startingTreadDepth ?? tire.treadDepth);
+  const summaryMeta = [
+    tire.size || "Size not saved",
+    typeof tire.recommendedPressure === "number" ? `${tire.recommendedPressure} PSI` : "PSI not saved",
+    treadDepth,
+  ].join(" • ");
 
   return `
-    <div class="tire-card">
-      <div class="vehicle-summary">
-        <strong>${position.label}</strong>
+    <details class="tire-dropdown tire-card">
+      <summary class="tire-dropdown-summary">
+        <span>
+          <strong>${position.label}</strong>
+          <span class="meta">${tireName}</span>
+          <span class="meta">${summaryMeta}</span>
+        </span>
+        <span class="tire-summary-mileage">${formatNumber(milesOnTire)} mi</span>
+      </summary>
+      <div class="tire-dropdown-content">
         <span class="meta">Tire ID: ${tire.tireId || "Not saved"}</span>
+        <span class="meta">Brand / model: ${tireName}</span>
+        <span class="meta">Size: ${tire.size || "Not saved"}</span>
+        <span class="meta">Starting tread depth: ${treadDepth}</span>
+        <span class="meta">Install date: ${safeFormatDate(tire.installDate)}</span>
+        <span class="meta">Install mileage: ${
+          typeof tire.installMileage === "number" ? `${formatNumber(tire.installMileage)} miles` : "Not saved"
+        }</span>
+        <span class="meta">Warranty miles: ${
+          typeof tire.warrantyMiles === "number" ? formatNumber(tire.warrantyMiles) : "Not saved"
+        }</span>
+        <span class="meta">${
+          warrantyRemaining !== null
+            ? `Miles left on warranty: ${formatNumber(warrantyRemaining)}`
+            : "Miles left on warranty: Not saved"
+        }</span>
+        <span class="meta">${
+          typeof tire.estimatedReplacementMileage === "number"
+            ? `Estimated replacement mileage: ${formatNumber(tire.estimatedReplacementMileage)}`
+            : "Estimated replacement mileage not saved"
+        }</span>
+        <span class="meta">${
+          replacementRemaining !== null
+            ? `Miles left until estimated replacement: ${formatNumber(replacementRemaining)}`
+            : "Miles left until estimated replacement: Not saved"
+        }</span>
+        ${
+          tireLifeProgress
+            ? progressBarMarkup(
+                "Tire Life",
+                tireLifeProgress.percent,
+                `${formatNumber(milesOnTire)} driven`,
+                `${formatNumber(replacementRemaining ?? 0)} remaining`
+              )
+            : ""
+        }
+        <span class="meta">${
+          typeof tire.recommendedPressure === "number"
+            ? `Recommended pressure: ${tire.recommendedPressure} PSI`
+            : "Recommended pressure not saved"
+        }</span>
+        <span class="meta">Miles driven on current tire: ${formatNumber(milesOnTire)}</span>
+        <div class="tire-card-actions">
+          <button class="button-secondary" type="button" data-rotate-tires="${vehicle.id}">Rotate tires</button>
+          <button class="button-secondary" type="button" data-replace-tire="${position.key}" data-vehicle-id="${vehicle.id}">
+            Replace tire
+          </button>
+          <button class="button-secondary" type="button" data-edit-tire="${position.key}" data-vehicle-id="${vehicle.id}">
+            Edit tire
+          </button>
+          <button class="button-secondary" type="button" data-view-tire-history="${position.key}">
+            View tire history
+          </button>
+        </div>
       </div>
-      <span class="meta">Brand / model: ${[tire.brand, tire.model].filter(Boolean).join(" ") || "Not saved"}</span>
-      <span class="meta">Size: ${tire.size || "Not saved"}</span>
-      <span class="meta">Starting tread depth: ${formatTreadDepthValue(tire.startingTreadDepth ?? tire.treadDepth)}</span>
-      <span class="meta">Install date: ${safeFormatDate(tire.installDate)}</span>
-      <span class="meta">Install mileage: ${
-        typeof tire.installMileage === "number" ? `${formatNumber(tire.installMileage)} miles` : "Not saved"
-      }</span>
-      <span class="meta">Warranty miles: ${
-        typeof tire.warrantyMiles === "number" ? formatNumber(tire.warrantyMiles) : "Not saved"
-      }</span>
-      <span class="meta">${
-        warrantyRemaining !== null
-          ? `Miles left on warranty: ${formatNumber(warrantyRemaining)}`
-          : "Miles left on warranty: Not saved"
-      }</span>
-      <span class="meta">${
-        typeof tire.estimatedReplacementMileage === "number"
-          ? `Estimated replacement mileage: ${formatNumber(tire.estimatedReplacementMileage)}`
-          : "Estimated replacement mileage not saved"
-      }</span>
-      <span class="meta">${
-        replacementRemaining !== null
-          ? `Miles left until estimated replacement: ${formatNumber(replacementRemaining)}`
-          : "Miles left until estimated replacement: Not saved"
-      }</span>
-      ${
-        tireLifeProgress
-          ? progressBarMarkup(
-              "Tire Life",
-              tireLifeProgress.percent,
-              `${formatNumber(milesOnTire)} driven`,
-              `${formatNumber(replacementRemaining ?? 0)} remaining`
-            )
-          : ""
-      }
-      <span class="meta">${
-        typeof tire.recommendedPressure === "number"
-          ? `Recommended pressure: ${tire.recommendedPressure} PSI`
-          : "Recommended pressure not saved"
-      }</span>
-      <span class="meta">Miles driven on current tire: ${formatNumber(milesOnTire)}</span>
-      <div class="tire-card-actions">
-        <button class="button-secondary" type="button" data-rotate-tires="${vehicle.id}">Rotate tires</button>
-        <button class="button-secondary" type="button" data-replace-tire="${position.key}" data-vehicle-id="${vehicle.id}">
-          Replace tire
-        </button>
-        <button class="button-secondary" type="button" data-edit-tire="${position.key}" data-vehicle-id="${vehicle.id}">
-          Edit tire
-        </button>
-        <button class="button-secondary" type="button" data-view-tire-history="${position.key}">
-          View tire history
-        </button>
-      </div>
-    </div>
+    </details>
   `;
 }
 
@@ -4516,6 +4581,7 @@ function setSchedulePlanExpanded(expanded) {
   isSchedulePlanExpanded = expanded;
   schedulePlanPanel.classList.toggle("is-hidden", !expanded);
   schedulePlanToggleButton.setAttribute("aria-expanded", String(expanded));
+  persistUiState();
 }
 
 function getRecurringTemplateByKey(serviceKey) {
@@ -5510,8 +5576,50 @@ function syncVehicleMileage(vehicleId, mileage) {
   }
 }
 
+function createDefaultUiState() {
+  return {
+    activeScreen: "dashboard",
+    historyView: "list",
+    tireTrackerExpanded: false,
+    expandedPanels: {
+      vehicleForm: false,
+      recordForm: false,
+      historyQuickAdd: false,
+      schedulePlan: false,
+    },
+    filters: {
+      history: {
+        search: "",
+        vehicleId: "",
+        category: "",
+        dateFrom: "",
+        dateTo: "",
+        sort: "newest",
+      },
+      schedule: {
+        category: "",
+        status: "all",
+      },
+    },
+  };
+}
+
+function createEmptyState() {
+  return {
+    schemaVersion: STORAGE_SCHEMA_VERSION,
+    updatedAt: null,
+    vehicles: [],
+    records: [],
+    customServiceTypes: [],
+    recurringPlans: [],
+    hiddenServiceTypes: [],
+    serviceDefinitions: [],
+    ui: createDefaultUiState(),
+  };
+}
+
 function loadState() {
-  const emptyState = { vehicles: [], records: [], customServiceTypes: [], recurringPlans: [], hiddenServiceTypes: [], serviceDefinitions: [] };
+  const emptyState = createEmptyState();
   const mergedState = [STORAGE_KEY, ...LEGACY_STORAGE_KEYS].reduce((nextState, key) => {
     const parsed = parseStoredState(localStorage.getItem(key));
     if (!parsed) {
@@ -5523,7 +5631,7 @@ function loadState() {
 
   const hadLegacyState = LEGACY_STORAGE_KEYS.some((key) => localStorage.getItem(key));
   if (hadLegacyState) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedState));
+    writeStoredState(mergedState, { silent: true });
     LEGACY_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
   }
 
@@ -5533,13 +5641,180 @@ function loadState() {
     mergedState.customServiceTypes || [],
     mergedState.serviceDefinitions.filter((serviceDefinition) => !serviceDefinition.baseName).map((serviceDefinition) => serviceDefinition.name)
   );
+  mergedState.ui = normalizeUiState(mergedState.ui);
+  mergedState.schemaVersion = STORAGE_SCHEMA_VERSION;
+  lastPersistedState = JSON.stringify(mergedState);
   return mergedState;
 }
 
-function persist() {
+function persist({ silent = false } = {}) {
+  syncUiStateToState();
   state.vehicles = state.vehicles.map(normalizeVehicleTireData);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  queueCloudSave();
+  state.serviceDefinitions = normalizeServiceDefinitions(state.serviceDefinitions || []);
+  state.schemaVersion = STORAGE_SCHEMA_VERSION;
+  state.updatedAt = new Date().toISOString();
+  writeStoredState(state, { silent });
+}
+
+function persistUiState() {
+  if (isRestoringUiState) {
+    return;
+  }
+
+  persist({ silent: true });
+}
+
+function writeStoredState(nextState, { silent = false } = {}) {
+  const serializedState = JSON.stringify(nextState);
+  if (serializedState === lastPersistedState) {
+    return;
+  }
+
+  try {
+    localStorage.setItem(STORAGE_KEY, serializedState);
+    lastPersistedState = serializedState;
+    localStorage.removeItem(TIRE_TRACKER_EXPANDED_KEY);
+    if (!silent) {
+      showSaveStatus("Saved");
+    }
+  } catch (error) {
+    console.error("Could not save car maintenance tracker state", error);
+    showSaveStatus("Save failed", { isError: true, hold: 2400 });
+  }
+}
+
+function showSaveStatus(message = "Saved", { isError = false, hold = 1300 } = {}) {
+  if (!saveStatus) {
+    return;
+  }
+
+  saveStatus.textContent = message;
+  saveStatus.classList.toggle("is-error", isError);
+  saveStatus.classList.add("is-visible");
+  clearTimeout(saveStatusTimer);
+  saveStatusTimer = setTimeout(() => {
+    saveStatus.classList.remove("is-visible");
+    saveStatus.classList.remove("is-error");
+  }, hold);
+}
+
+function normalizeUiState(uiState) {
+  const defaults = createDefaultUiState();
+  const nextUi = uiState && typeof uiState === "object" ? uiState : {};
+  const expandedPanels = nextUi.expandedPanels && typeof nextUi.expandedPanels === "object" ? nextUi.expandedPanels : {};
+  const filters = nextUi.filters && typeof nextUi.filters === "object" ? nextUi.filters : {};
+  const historyFilters = filters.history && typeof filters.history === "object" ? filters.history : {};
+  const scheduleFilters = filters.schedule && typeof filters.schedule === "object" ? filters.schedule : {};
+
+  return {
+    ...defaults,
+    activeScreen: cleanText(nextUi.activeScreen) || defaults.activeScreen,
+    historyView: ["list", "timeline"].includes(nextUi.historyView) ? nextUi.historyView : defaults.historyView,
+    tireTrackerExpanded: Boolean(nextUi.tireTrackerExpanded),
+    expandedPanels: {
+      ...defaults.expandedPanels,
+      vehicleForm: Boolean(expandedPanels.vehicleForm),
+      recordForm: Boolean(expandedPanels.recordForm),
+      historyQuickAdd: Boolean(expandedPanels.historyQuickAdd),
+      schedulePlan: Boolean(expandedPanels.schedulePlan),
+    },
+    filters: {
+      history: {
+        ...defaults.filters.history,
+        search: cleanText(historyFilters.search),
+        vehicleId: cleanText(historyFilters.vehicleId),
+        category: cleanText(historyFilters.category),
+        dateFrom: cleanText(historyFilters.dateFrom),
+        dateTo: cleanText(historyFilters.dateTo),
+        sort: cleanText(historyFilters.sort) || defaults.filters.history.sort,
+      },
+      schedule: {
+        ...defaults.filters.schedule,
+        category: cleanText(scheduleFilters.category),
+        status: cleanText(scheduleFilters.status) || defaults.filters.schedule.status,
+      },
+    },
+  };
+}
+
+function syncUiStateToState() {
+  state.ui = normalizeUiState(state.ui);
+  const activeScreen = screens.find((screen) => screen.classList.contains("is-active"))?.dataset.screen;
+  state.ui.activeScreen = activeScreen || state.ui.activeScreen || "dashboard";
+  state.ui.historyView = activeHistoryView;
+  state.ui.tireTrackerExpanded = Boolean(isTireTrackerExpanded);
+  state.ui.expandedPanels = {
+    vehicleForm: Boolean(isVehicleFormExpanded),
+    recordForm: Boolean(isRecordFormExpanded),
+    historyQuickAdd: Boolean(isHistoryQuickAddExpanded),
+    schedulePlan: Boolean(isSchedulePlanExpanded),
+  };
+  state.ui.filters = {
+    history: {
+      search: cleanText(historySearchInput?.value),
+      vehicleId: cleanText(historyVehicleFilter?.value),
+      category: cleanText(historyCategoryFilter?.value),
+      dateFrom: cleanText(historyDateFrom?.value),
+      dateTo: cleanText(historyDateTo?.value),
+      sort: cleanText(historySortSelect?.value) || "newest",
+    },
+    schedule: {
+      category: cleanText(scheduleCategoryFilter?.value),
+      status: cleanText(scheduleStatusFilter?.value) || "all",
+    },
+  };
+}
+
+function setSelectValueIfOptionExists(select, value) {
+  if (!select || !value) {
+    return;
+  }
+
+  const hasOption = [...select.options].some((option) => option.value === value);
+  if (hasOption) {
+    select.value = value;
+  }
+}
+
+function restoreUiStateControls() {
+  const uiState = normalizeUiState(state.ui);
+  isRestoringUiState = true;
+  activeHistoryView = uiState.historyView;
+  isTireTrackerExpanded = uiState.tireTrackerExpanded;
+  isVehicleFormExpanded = uiState.expandedPanels.vehicleForm;
+  isRecordFormExpanded = uiState.expandedPanels.recordForm;
+  isHistoryQuickAddExpanded = uiState.expandedPanels.historyQuickAdd;
+  isSchedulePlanExpanded = uiState.expandedPanels.schedulePlan;
+
+  if (historySearchInput) {
+    historySearchInput.value = uiState.filters.history.search;
+  }
+  setSelectValueIfOptionExists(historyVehicleFilter, uiState.filters.history.vehicleId);
+  setSelectValueIfOptionExists(historyCategoryFilter, uiState.filters.history.category);
+  if (historyDateFrom) {
+    historyDateFrom.value = uiState.filters.history.dateFrom;
+  }
+  if (historyDateTo) {
+    historyDateTo.value = uiState.filters.history.dateTo;
+  }
+  setSelectValueIfOptionExists(historySortSelect, uiState.filters.history.sort);
+  setSelectValueIfOptionExists(scheduleCategoryFilter, uiState.filters.schedule.category);
+  setSelectValueIfOptionExists(scheduleStatusFilter, uiState.filters.schedule.status);
+  screens.forEach((screen) => {
+    screen.classList.toggle("is-active", screen.dataset.screen === uiState.activeScreen);
+  });
+  screenButtons.forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.screenTarget === uiState.activeScreen);
+  });
+  vehicleFormPanel?.classList.toggle("is-hidden", !isVehicleFormExpanded);
+  vehicleFormToggleButton?.setAttribute("aria-expanded", String(isVehicleFormExpanded));
+  recordFormPanel?.classList.toggle("is-hidden", !isRecordFormExpanded);
+  recordFormToggleButton?.setAttribute("aria-expanded", String(isRecordFormExpanded));
+  historyQuickAddPanel?.classList.toggle("is-hidden", !isHistoryQuickAddExpanded);
+  historyQuickAddToggleButton?.setAttribute("aria-expanded", String(isHistoryQuickAddExpanded));
+  schedulePlanPanel?.classList.toggle("is-hidden", !isSchedulePlanExpanded);
+  schedulePlanToggleButton?.setAttribute("aria-expanded", String(isSchedulePlanExpanded));
+  isRestoringUiState = false;
 }
 
 function normalizeVehicleTireData(vehicle) {
@@ -5615,12 +5890,15 @@ function parseStoredState(saved) {
   try {
     const parsed = JSON.parse(saved);
     return {
+      schemaVersion: Number(parsed.schemaVersion) || 1,
+      updatedAt: parsed.updatedAt ?? null,
       vehicles: Array.isArray(parsed.vehicles) ? parsed.vehicles : [],
       records: Array.isArray(parsed.records) ? parsed.records : [],
       customServiceTypes: Array.isArray(parsed.customServiceTypes) ? parsed.customServiceTypes : [],
       recurringPlans: Array.isArray(parsed.recurringPlans) ? parsed.recurringPlans : [],
       hiddenServiceTypes: Array.isArray(parsed.hiddenServiceTypes) ? parsed.hiddenServiceTypes : [],
       serviceDefinitions: Array.isArray(parsed.serviceDefinitions) ? parsed.serviceDefinitions : [],
+      ui: normalizeUiState(parsed.ui),
     };
   } catch {
     return null;
@@ -5628,13 +5906,35 @@ function parseStoredState(saved) {
 }
 
 function mergeStoredState(baseState, incomingState) {
+  const baseUi = normalizeUiState(baseState.ui);
+  const incomingUi = normalizeUiState(incomingState.ui);
   return {
+    schemaVersion: STORAGE_SCHEMA_VERSION,
+    updatedAt: incomingState.updatedAt || baseState.updatedAt || null,
     vehicles: mergeById(baseState.vehicles, incomingState.vehicles),
     records: mergeById(baseState.records, incomingState.records),
     customServiceTypes: mergeUniqueText(baseState.customServiceTypes, incomingState.customServiceTypes),
     recurringPlans: mergeById(baseState.recurringPlans, incomingState.recurringPlans),
     hiddenServiceTypes: mergeUniqueText(baseState.hiddenServiceTypes || [], incomingState.hiddenServiceTypes || []),
     serviceDefinitions: mergeById(baseState.serviceDefinitions || [], incomingState.serviceDefinitions || []),
+    ui: {
+      ...baseUi,
+      ...incomingUi,
+      expandedPanels: {
+        ...baseUi.expandedPanels,
+        ...incomingUi.expandedPanels,
+      },
+      filters: {
+        history: {
+          ...baseUi.filters.history,
+          ...incomingUi.filters.history,
+        },
+        schedule: {
+          ...baseUi.filters.schedule,
+          ...incomingUi.filters.schedule,
+        },
+      },
+    },
   };
 }
 

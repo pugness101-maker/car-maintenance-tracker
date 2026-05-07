@@ -13,13 +13,13 @@ npm start
 Then open:
 
 ```text
-http://localhost:3000
+http://localhost:3001
 ```
 
 You can also run the server directly:
 
 ```bash
-python3 -m http.server 3000
+python3 -m http.server 3001 --directory www
 ```
 
 ## Data Storage

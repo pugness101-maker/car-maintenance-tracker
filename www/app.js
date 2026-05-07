@@ -3035,6 +3035,7 @@ function renderVehicles() {
             <p class="eyebrow">Vehicle Header</p>
             <h3>${vehicle.year} ${vehicle.make} ${vehicle.model}${vehicle.trim ? ` ${vehicle.trim}` : ""}</h3>
             <span class="meta">Current mileage: ${formatNumber(vehicle.currentMileage)} miles</span>
+            
           </div>
           <div class="inline-row">
             ${nextDue ? statusPill(nextDue.status, nextDue.badgeText) : statusPill("ok", "No due services")}
@@ -3061,14 +3062,21 @@ function renderVehicles() {
       </div>
 
       <div class="garage-grid">
-        <section class="garage-section">
+  <section class="garage-section tire-tracker-section">
           <div class="vehicle-summary">
-            <strong>Tire Tracker</strong>
-            <span class="meta">Track each tire by position, warranty, replacement target, and service history.</span>
-          </div>
-          <div class="tire-grid garage-tire-card-grid">
-            ${TIRE_POSITIONS.map((position) => tireCardMarkup(vehicle, vehicle.tires?.[position.key] ?? null, position)).join("")}
-          </div>
+           <div class="tire-visual-tracker">
+  <div class="tire-row">
+    ${tireCardMarkup(vehicle, vehicle.tires?.frontLeft, TIRE_POSITIONS[0])}
+    ${tireCardMarkup(vehicle, vehicle.tires?.frontRight, TIRE_POSITIONS[1])}
+  </div>
+
+  <div class="car-body-pill">Vehicle</div>
+
+  <div class="tire-row">
+    ${tireCardMarkup(vehicle, vehicle.tires?.rearLeft, TIRE_POSITIONS[2])}
+    ${tireCardMarkup(vehicle, vehicle.tires?.rearRight, TIRE_POSITIONS[3])}
+  </div>
+</div>
           <div class="timeline-item tire-history-panel">
             <div class="vehicle-summary">
               <div>
@@ -3104,22 +3112,7 @@ function renderVehicles() {
           </div>
         </section>
 
-        <section class="garage-section">
-          <div class="vehicle-summary">
-            <strong>Vehicle Specs</strong>
-            <span class="meta">Core vehicle details and saved identifiers</span>
-          </div>
-          <div class="schedule-meta-grid">
-            <span class="meta">Engine: ${vehicle.engineSpec || "Not saved"}</span>
-            <span class="meta">Drivetrain: ${vehicle.drivetrain || "Not saved"}</span>
-            <span class="meta">Fuel type: ${vehicle.fuelType || "Not saved"}</span>
-            <span class="meta">Oil capacity: ${vehicle.oilCapacity || "Not saved"}</span>
-            <span class="meta">Tire size: ${vehicle.vehicleTireSize || "Not saved"}</span>
-            <span class="meta">Recommended PSI: ${
-              typeof vehicle.vehicleRecommendedPsi === "number" ? vehicle.vehicleRecommendedPsi : "Not saved"
-            }</span>
-          </div>
-        </section>
+      
 
         <section class="garage-section">
           <div class="vehicle-summary">

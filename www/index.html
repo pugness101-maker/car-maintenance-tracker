@@ -14,7 +14,22 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <div class="app-shell">
+
+  <!-- LOGIN SCREEN -->
+  <section id="loginScreen" class="login-screen">
+    <div class="login-card">
+      <h1>Welcome</h1>
+      <p>Save your data or continue as guest</p>
+
+      <input type="email" placeholder="Email" />
+      <input type="password" placeholder="Password" />
+
+      <button id="guestBtn">Continue as guest</button>
+    </div>
+  </section>
+
+  <!-- MAIN APP -->
+  <div id="appShell" class="app-shell is-hidden">
       <header class="app-topbar">
         <div>
           <p class="eyebrow">Car Maintenance Tracker</p>
@@ -24,24 +39,7 @@
             service history.
           </p>
         </div>
-        <section class="auth-panel" aria-label="Account">
-          <div id="authSignedOut">
-            <p class="eyebrow">Account</p>
-            <form id="authForm" class="auth-form">
-              <input type="email" name="email" placeholder="Email" autocomplete="email" required />
-              <input
-                type="password"
-                name="password"
-                placeholder="Password"
-                autocomplete="current-password"
-                required
-              />
-              <div class="inline-row">
-                <button id="authSignInButton" class="button-primary" type="submit">Log in</button>
-                <button id="authSignUpButton" class="button-secondary" type="button">Sign up</button>
-              </div>
-            </form>
-          </div>
+    
           <div id="authSignedIn" class="is-hidden">
             <p class="eyebrow">Signed in</p>
             <strong id="authUserEmail">Account</strong>
@@ -695,5 +693,17 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="app.js"></script>
+      </div> <!-- appShell -->
+
+<script>
+  const guestBtn = document.getElementById("guestBtn");
+  const loginScreen = document.getElementById("loginScreen");
+  const appShell = document.getElementById("appShell");
+
+  guestBtn.addEventListener("click", () => {
+    loginScreen.style.display = "none";
+    appShell.classList.remove("is-hidden");
+  });
+</script>
   </body>
 </html>

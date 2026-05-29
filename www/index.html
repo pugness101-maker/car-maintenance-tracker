@@ -11,7 +11,7 @@
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="icons/icon-maskable.svg" />
-    <link rel="stylesheet" href="styles.css?v=local-tools-v10" />
+    <link rel="stylesheet" href="styles.css?v=local-tools-v11" />
   </head>
   <body>
     <div id="appShell" class="app-shell">
@@ -258,12 +258,15 @@
                     placeholder="Explain when this service should show as due"
                   ></textarea>
                 </label>
-                <div class="full-span inline-row">
+                <div class="full-span inline-row schedule-plan-actions">
                   <button id="schedulePlanSubmitButton" class="button-primary" type="submit">
                     Save Plan
                   </button>
                   <button id="schedulePlanCancelButton" class="button-secondary" type="button">
                     Cancel
+                  </button>
+                  <button id="schedulePlanDeleteButton" class="button-danger is-hidden" type="button">
+                    Delete Plan
                   </button>
                 </div>
               </form>
@@ -325,11 +328,11 @@
               </label>
               <label>
                 Install date
-                <input type="date" name="installDate" required />
+                <input type="date" name="installDate" />
               </label>
               <label>
                 Mileage at install
-                <input type="number" name="installMileage" min="0" step="1" required />
+                <input type="number" name="installMileage" min="0" step="1" />
               </label>
               <label>
                 Shop / installer
@@ -337,25 +340,31 @@
               </label>
               <label>
                 Tire brand
-                <input type="text" name="brand" placeholder="Michelin" required />
+                <input type="text" name="brand" placeholder="Michelin" />
               </label>
               <label>
                 Tire model
-                <input type="text" name="model" placeholder="Defender 2" required />
+                <input type="text" name="model" placeholder="Defender 2" />
               </label>
               <label>
                 Tire type
-                <input type="text" name="type" placeholder="All-season" required />
+                <input type="text" name="type" placeholder="All-season" />
               </label>
               <label>
                 Tire size
                 <input type="text" name="size" placeholder="235/45R18" />
               </label>
               <label>
-                Starting tread depth
-                <select name="treadDepth">
-                  <option value="">Select tread depth</option>
-                </select>
+                Tread Left Rating (10 = new, 1 = worn)
+                <input
+                  type="number"
+                  name="treadDepth"
+                  min="1"
+                  max="10"
+                  step="1"
+                  placeholder="10"
+                />
+                <span class="field-helper">Higher number = more tread left. Tread rating goes down as the tire wears.</span>
               </label>
               <label>
                 Warranty miles
@@ -578,10 +587,16 @@
                     <input type="text" name="recordTireSize" placeholder="235/45R18" />
                   </label>
                   <label>
-                    Starting tread depth
-                    <select name="recordTireTreadDepth">
-                      <option value="">Select tread depth</option>
-                    </select>
+                    Tread Left Rating (10 = new, 1 = worn)
+                    <input
+                      type="number"
+                      name="recordTireTreadDepth"
+                      min="1"
+                      max="10"
+                      step="1"
+                      placeholder="10"
+                    />
+                    <span class="field-helper">Higher number = more tread left. Tread rating goes down as the tire wears.</span>
                   </label>
                   <label>
                     Warranty miles
@@ -682,6 +697,6 @@
 
     <datalist id="serviceTypeOptions"></datalist>
 
-    <script src="app.js?v=local-tools-v10"></script>
+    <script src="app.js?v=local-tools-v11"></script>
   </body>
 </html>

@@ -363,6 +363,56 @@ fieldset {
   font-weight: 600;
 }
 
+.field-helper {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.tire-tracker-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.tire-rotation-panel {
+  display: grid;
+  gap: 14px;
+  margin-top: 14px;
+  padding: 16px;
+  border: 1px dashed rgba(12, 108, 103, 0.35);
+  border-radius: 18px;
+  background: rgba(12, 108, 103, 0.06);
+}
+
+.tire-rotation-panel.is-hidden {
+  display: none;
+}
+
+.tire-movement-history {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.tire-movement-entry {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid rgba(62, 76, 91, 0.12);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.tire-tread-badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
 input,
 textarea,
 select {
@@ -462,6 +512,24 @@ select:focus {
 
 .danger-action {
   border: 1px solid rgba(180, 35, 24, 0.12);
+}
+
+.button-danger {
+  color: #fff;
+  background: linear-gradient(135deg, #b42318, #912018);
+  border: 1px solid rgba(180, 35, 24, 0.24);
+}
+
+.button-danger:hover {
+  transform: translateY(-1px);
+}
+
+.schedule-plan-actions {
+  align-items: center;
+}
+
+.schedule-plan-actions .button-danger {
+  margin-left: auto;
 }
 
 .visually-hidden {
@@ -1618,11 +1686,16 @@ button {
 
   .button-primary,
   .button-secondary,
-  .button-ghost {
+  .button-ghost,
+  .button-danger {
     min-height: 46px;
     width: 100%;
     justify-content: center;
     text-align: center;
+  }
+
+  .schedule-plan-actions .button-danger {
+    margin-left: 0;
   }
 
   .button-ghost {

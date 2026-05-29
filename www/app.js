@@ -416,7 +416,16 @@ const TIRE_POSITIONS = [
   { key: "rearLeft", label: "Rear left" },
   { key: "rearRight", label: "Rear right" },
 ];
-const TREAD_DEPTH_OPTIONS = Array.from({ length: 13 }, (_, index) => 14 - index);
+const TREAD_RATING_MIN = 1;
+const TREAD_RATING_MAX = 10;
+const LEGACY_TREAD_32NDS_MIN = 2;
+const LEGACY_TREAD_32NDS_MAX = 14;
+const ROTATION_PRESETS = [
+  { value: "front-to-back", label: "Front-to-back" },
+  { value: "cross-rotation", label: "Cross rotation" },
+  { value: "rearward-cross", label: "Rearward cross" },
+  { value: "manual", label: "Manual move" },
+];
 let lastPersistedState = "";
 let saveStatusTimer = null;
 let isRestoringUiState = false;
@@ -483,6 +492,7 @@ const schedulePlanForm = document.querySelector("#schedulePlanForm");
 const schedulePlanTitle = document.querySelector("#schedulePlanTitle");
 const schedulePlanSubmitButton = document.querySelector("#schedulePlanSubmitButton");
 const schedulePlanCancelButton = document.querySelector("#schedulePlanCancelButton");
+const schedulePlanDeleteButton = document.querySelector("#schedulePlanDeleteButton");
 const scheduleMileageList = document.querySelector("#scheduleMileageList");
 const scheduleTimeList = document.querySelector("#scheduleTimeList");
 const scheduleBothList = document.querySelector("#scheduleBothList");
@@ -524,6 +534,7 @@ let activeGarageTirePosition = "frontLeft";
 let activeHistoryView = state.ui?.historyView || "list";
 let isTireTrackerExpanded =
   state.ui?.tireTrackerExpanded ?? localStorage.getItem(TIRE_TRACKER_EXPANDED_KEY) === "true";
+let isTireRotationPanelOpen = false;
 
 const DEFAULT_TIRE_ROTATION_MILES = 5000;
 
@@ -540,6 +551,7 @@ function bindEvents() {
   tireEditForm.addEventListener("submit", handleTireEditSubmit);
   recordForm.addEventListener("submit", handleRecordSubmit);
   vehicleList.addEventListener("click", handleVehicleListClick);
+  vehicleList.addEventListener("change", handleVehicleListChange);
   vehicleList.addEventListener("submit", handleVehicleListSubmit);
   historyList.addEventListener("click", handleHistoryListClick);
   historyTimeline.addEventListener("click", handleHistoryListClick);
@@ -563,6 +575,7 @@ function bindEvents() {
     initializeCustomSchedulePlan();
   });
   schedulePlanCancelButton.addEventListener("click", resetSchedulePlanMode);
+  schedulePlanDeleteButton.addEventListener("click", handleSchedulePlanDelete);
   scheduleVehicleSelect.addEventListener("change", handleScheduleVehicleChange);
   dashboardVehicleSelect.addEventListener("change", handleDashboardVehicleChange);
   garageVehicleSelect.addEventListener("change", handleGarageVehicleChange);
@@ -777,7 +790,6 @@ function applyImportedState(importedState) {
 
 function renderAllStaticOptions() {
   renderServiceTypeOptions();
-  renderTreadDepthOptions();
   renderRecordServiceChecklist();
   renderHistoryQuickServiceChecklist();
   renderHistoryCategoryOptions();
@@ -1058,15 +1070,70 @@ function handleScheduleScreenClick(event) {
   const deleteButton = event.target.closest("[data-delete-recurring-plan]");
   if (deleteButton) {
     const plan = getRecurringPlanByKey(deleteButton.dataset.deleteRecurringPlan);
-    if (!plan || !plan.isCustom) {
+    if (!plan) {
       return;
     }
 
-    state.recurringPlans = state.recurringPlans.filter((item) => item.id !== plan.id);
+    if (!confirmDeleteRecurringPlan()) {
+      return;
+    }
+
+    deleteRecurringPlan(plan);
     persist();
-    resetSchedulePlanMode();
+    if (editingSchedulePlanKey === plan.planKey) {
+      resetSchedulePlanMode();
+    }
     render();
   }
+}
+
+function confirmDeleteRecurringPlan() {
+  return window.confirm("Delete this maintenance plan? This will not delete service history.");
+}
+
+function deleteRecurringPlan(plan) {
+  if (!plan) {
+    return;
+  }
+
+  if (plan.isCustom) {
+    state.recurringPlans = state.recurringPlans.filter((item) => item.id !== plan.id);
+    return;
+  }
+
+  state.recurringPlans = state.recurringPlans.filter(
+    (item) => !(item.vehicleId === plan.vehicleId && !item.isCustom && item.serviceKey === plan.serviceKey)
+  );
+  state.recurringPlans.push({
+    id: plan.id || `${plan.vehicleId}:${plan.serviceKey}`,
+    vehicleId: plan.vehicleId,
+    serviceKey: plan.serviceKey,
+    serviceName: plan.serviceName,
+    category: plan.category,
+    isCustom: false,
+    removed: true,
+    enabled: false,
+  });
+}
+
+function handleSchedulePlanDelete() {
+  if (!editingSchedulePlanKey) {
+    return;
+  }
+
+  const plan = getRecurringPlanByKey(editingSchedulePlanKey);
+  if (!plan) {
+    return;
+  }
+
+  if (!confirmDeleteRecurringPlan()) {
+    return;
+  }
+
+  deleteRecurringPlan(plan);
+  persist();
+  resetSchedulePlanMode();
+  render();
 }
 
 function handleSchedulePlanSubmit(event) {
@@ -1112,7 +1179,27 @@ function handleSchedulePlanSubmit(event) {
   render();
 }
 
+function handleVehicleListChange(event) {
+  if (!event.target.matches('[data-garage-rotation-form] [name="rotationType"]')) {
+    return;
+  }
+
+  const form = event.target.closest("[data-garage-rotation-form]");
+  const manualFields = form?.querySelector("[data-manual-move-fields]");
+  manualFields?.classList.toggle("is-hidden", event.target.value !== "manual");
+}
+
 function handleVehicleListClick(event) {
+  const openTireRotationButton = event.target.closest("[data-open-tire-rotation]");
+  if (openTireRotationButton) {
+    isTireRotationPanelOpen = !isTireRotationPanelOpen;
+    renderVehicles();
+    if (isTireRotationPanelOpen) {
+      vehicleList.querySelector(".tire-rotation-panel")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    return;
+  }
+
   const tireTrackerToggle = event.target.closest("[data-toggle-tire-tracker]");
   if (tireTrackerToggle) {
     isTireTrackerExpanded = !isTireTrackerExpanded;
@@ -1277,19 +1364,18 @@ async function handleVehicleListSubmit(event) {
 
     const formData = new FormData(treadForm);
     const position = cleanText(formData.get("position"));
-    const nextDepth = numericOrNull(formData.get("treadDepth"));
+    const nextRating = parseTreadRatingInput(formData.get("treadDepth"));
     const tire = vehicle.tires?.[position];
-    if (!tire || typeof nextDepth !== "number") {
+    if (!tire || typeof nextRating !== "number") {
       return;
     }
 
-    tire.treadHistory = tire.treadHistory || [];
-    tire.treadHistory.unshift({
-      depth: nextDepth,
+    logTreadDepthEntry(tire, {
+      depth: nextRating,
       mileage: vehicle.currentMileage,
       date: new Date().toISOString().slice(0, 10),
+      notes: "Logged from garage tread form",
     });
-    tire.treadDepth = nextDepth;
     tire.updatedAt = new Date().toISOString();
     persist();
     renderVehicles();
@@ -1305,11 +1391,30 @@ async function handleVehicleListSubmit(event) {
     }
 
     const formData = new FormData(rotationForm);
-    const rotationType = cleanText(formData.get("rotationType")) || "front-to-rear";
+    const rotationType = cleanText(formData.get("rotationType")) || "front-to-back";
     const notes = cleanText(formData.get("notes"));
     const mileage = vehicle.currentMileage;
     const date = new Date().toISOString().slice(0, 10);
-    applyTireRotation(vehicle, { rotationType, notes, mileage, date });
+
+    if (rotationType === "manual") {
+      const fromPosition = cleanText(formData.get("fromPosition"));
+      const toPosition = cleanText(formData.get("toPosition"));
+      if (!fromPosition || !toPosition) {
+        alert("Choose both a from and to position for a manual tire move.");
+        return;
+      }
+      if (fromPosition === toPosition) {
+        alert("Choose different positions for a manual tire move.");
+        return;
+      }
+      if (!vehicle.tires?.[fromPosition]) {
+        alert("No tire is saved at the selected from position.");
+        return;
+      }
+      applyManualTireMove(vehicle, fromPosition, toPosition, { notes, mileage, date });
+    } else {
+      applyTireRotation(vehicle, { rotationType, notes, mileage, date });
+    }
     state.records.unshift({
       id: crypto.randomUUID(),
       vehicleId: vehicle.id,
@@ -1326,9 +1431,7 @@ async function handleVehicleListSubmit(event) {
       updatedAt: new Date().toISOString(),
     });
     persist();
-    renderVehicles();
-    renderDashboard();
-    renderHistory();
+    render();
     return;
   }
 
@@ -1362,9 +1465,13 @@ async function handleVehicleListSubmit(event) {
 function handleTireEditSubmit(event) {
   event.preventDefault();
   const formData = new FormData(tireEditForm);
-  const vehicleId = formData.get("vehicleId");
-  const position = formData.get("position");
+  const vehicleId = cleanText(formData.get("vehicleId"));
+  const position = cleanText(formData.get("position"));
   const mode = cleanText(formData.get("mode")) || "edit";
+  if (!vehicleId || !position) {
+    return;
+  }
+
   const vehicle = state.vehicles.find((item) => item.id === vehicleId);
   if (!vehicle) {
     return;
@@ -1375,7 +1482,11 @@ function handleTireEditSubmit(event) {
   }
 
   const existingTire = vehicle.tires[position] ?? {};
-  const nextTreadDepth = numericOrNull(formData.get("treadDepth"));
+  const treadInput = formData.get("treadDepth");
+  const nextTreadDepth =
+    treadInput === "" || treadInput === null ? null : parseTreadRatingInput(treadInput);
+  const installMileage = numericOrNull(formData.get("installMileage"));
+  const installDate = cleanText(formData.get("installDate"));
   const basePayload = {
     ...existingTire,
     id: existingTire.id ?? crypto.randomUUID(),
@@ -1388,12 +1499,13 @@ function handleTireEditSubmit(event) {
     size: cleanText(formData.get("size")),
     treadDepth: nextTreadDepth,
     currentTreadDepth: nextTreadDepth,
-    startingTreadDepth: existingTire.startingTreadDepth ?? nextTreadDepth,
+    startingTreadDepth:
+      nextTreadDepth ?? normalizeTreadRating(existingTire.startingTreadDepth) ?? null,
     warrantyMiles: numericOrNull(formData.get("warrantyMiles")),
     estimatedReplacementMileage: numericOrNull(formData.get("estimatedReplacementMileage")),
     recommendedPressure: numericOrNull(formData.get("recommendedPressure")),
-    installDate: formData.get("installDate"),
-    installMileage: Number(formData.get("installMileage")),
+    installDate,
+    installMileage,
     installer: cleanText(formData.get("installer")),
     notes: cleanText(formData.get("notes")),
     updatedAt: new Date().toISOString(),
@@ -1425,7 +1537,7 @@ function handleTireEditSubmit(event) {
     if (typeof nextTreadDepth === "number") {
       logTreadDepthEntry(nextTire, {
         depth: nextTreadDepth,
-        mileage: basePayload.installMileage || vehicle.currentMileage,
+        mileage: basePayload.installMileage ?? vehicle.currentMileage,
         date: basePayload.installDate || new Date().toISOString().slice(0, 10),
         notes: "Saved from tire editor",
       });
@@ -1434,7 +1546,9 @@ function handleTireEditSubmit(event) {
   }
 
   activeGarageTirePosition = position;
-  syncVehicleMileage(vehicleId, vehicle.tires[position].installMileage);
+  if (typeof vehicle.tires[position]?.installMileage === "number") {
+    syncVehicleMileage(vehicleId, vehicle.tires[position].installMileage);
+  }
   persist();
   resetTireEditMode();
   render();
@@ -1475,7 +1589,7 @@ async function handleRecordSubmit(event) {
         model: cleanText(formData.get("recordTireModel")),
         type: cleanText(formData.get("recordTireType")),
         size: cleanText(formData.get("recordTireSize")),
-        treadDepth: numericOrNull(formData.get("recordTireTreadDepth")),
+        treadDepth: parseTreadRatingInput(formData.get("recordTireTreadDepth")),
         warrantyMiles: numericOrNull(formData.get("recordTireWarrantyMiles")),
         estimatedReplacementMileage: numericOrNull(formData.get("recordTireEstimatedReplacementMileage")),
         recommendedPressure: numericOrNull(formData.get("recordTireRecommendedPressure")),
@@ -2838,8 +2952,80 @@ function buildDashboardMiniTireStatusMarkup(vehicle, records) {
   `;
 }
 
+function normalizeTreadRating(value) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return null;
+  }
+
+  const rounded = Math.round(value);
+  if (rounded >= TREAD_RATING_MIN && rounded <= TREAD_RATING_MAX) {
+    return rounded;
+  }
+
+  if (rounded > TREAD_RATING_MAX) {
+    const clamped32 = Math.max(LEGACY_TREAD_32NDS_MIN, Math.min(LEGACY_TREAD_32NDS_MAX, rounded));
+    const normalized =
+      ((clamped32 - LEGACY_TREAD_32NDS_MIN) / (LEGACY_TREAD_32NDS_MAX - LEGACY_TREAD_32NDS_MIN)) *
+        (TREAD_RATING_MAX - TREAD_RATING_MIN) +
+      TREAD_RATING_MIN;
+    return Math.max(TREAD_RATING_MIN, Math.min(TREAD_RATING_MAX, Math.round(normalized)));
+  }
+
+  return Math.max(TREAD_RATING_MIN, Math.min(TREAD_RATING_MAX, rounded));
+}
+
+function parseTreadRatingInput(value) {
+  return normalizeTreadRating(numericOrNull(value));
+}
+
+function getTireTreadRating(tire) {
+  if (!tire) {
+    return null;
+  }
+
+  const current =
+    typeof tire.currentTreadDepth === "number"
+      ? tire.currentTreadDepth
+      : typeof tire.treadDepth === "number"
+        ? tire.treadDepth
+        : tire.treadHistory?.[0]?.depth ?? null;
+  return normalizeTreadRating(current);
+}
+
+function formatTireTreadLabel(tire) {
+  const rating = getTireTreadRating(tire);
+  return typeof rating === "number" ? `Tread: ${rating}/10` : "Tread: --";
+}
+
 function formatTireDepthLabel(tire) {
-  return typeof tire?.treadDepth === "number" ? `${tire.treadDepth}/32"` : "--";
+  return formatTireTreadLabel(tire);
+}
+
+function getTreadRatingBadgeMeta(rating) {
+  if (typeof rating !== "number") {
+    return { status: "setup", label: "No rating" };
+  }
+  if (rating >= 8) {
+    return { status: "ok", label: "Good" };
+  }
+  if (rating >= 4) {
+    return { status: "upcoming", label: "Monitor" };
+  }
+  return { status: "due", label: "Replace soon" };
+}
+
+function formatTreadRatingValue(value) {
+  const rating = normalizeTreadRating(value);
+  return typeof rating === "number" ? `Tread: ${rating}/10` : "Not saved";
+}
+
+function getTireDisplayName(tire) {
+  const label = [tire?.brand, tire?.model].filter(Boolean).join(" ").trim();
+  return label || `Tire ${(tire?.tireId || tire?.id || "").slice(0, 8) || "unknown"}`;
+}
+
+function getTirePositionLabel(positionKey) {
+  return TIRE_POSITIONS.find((position) => position.key === positionKey)?.label || positionKey;
 }
 
 function buildDashboardHealthMetrics(recurringSummaries) {
@@ -3098,11 +3284,17 @@ function renderVehicles() {
               <strong>Tire Tracker</strong>
               <span class="meta">${trackedTireCount} tires tracked • Front/rear layout</span>
             </div>
-            <button class="button-secondary tire-tracker-toggle" type="button" data-toggle-tire-tracker aria-expanded="${isTireTrackerExpanded}">
-              <span>${isTireTrackerExpanded ? "Collapse" : "Expand"}</span>
-              <span aria-hidden="true">${isTireTrackerExpanded ? "⌃" : "⌄"}</span>
-            </button>
+            <div class="tire-tracker-actions">
+              <button class="button-secondary" type="button" data-open-tire-rotation>
+                Rotate / Move Tires
+              </button>
+              <button class="button-secondary tire-tracker-toggle" type="button" data-toggle-tire-tracker aria-expanded="${isTireTrackerExpanded}">
+                <span>${isTireTrackerExpanded ? "Collapse" : "Expand"}</span>
+                <span aria-hidden="true">${isTireTrackerExpanded ? "⌃" : "⌄"}</span>
+              </button>
+            </div>
           </div>
+          ${buildTireRotationPanelMarkup(vehicle)}
           ${
             isTireTrackerExpanded
               ? `
@@ -3126,24 +3318,9 @@ function renderVehicles() {
                   </div>
                   <span class="meta">Tire ID: ${selectedTire?.tireId || "Not saved"}</span>
                   <span class="meta">Position history: ${buildTirePositionHistoryLabel(selectedTire)}</span>
+                  <span class="meta">Tread history: ${buildTireTreadHistoryLabel(selectedTire)}</span>
                   <span class="meta">Rotation history: ${buildTireRotationHistoryLabel(selectedTire, tireRotationHistory)}</span>
                   <span class="meta">Replacement history: ${buildTireReplacementHistoryLabel(vehicle, selectedTire)}</span>
-                  <form class="garage-inline-form" data-garage-rotation-form="${vehicle.id}">
-                    <input type="hidden" name="vehicleId" value="${vehicle.id}" />
-                    <label>
-                      Rotation type
-                      <select name="rotationType">
-                        <option value="front-to-rear">Front to rear</option>
-                        <option value="rear-to-front">Rear to front</option>
-                        <option value="cross-rotation">Cross rotation</option>
-                      </select>
-                    </label>
-                    <label>
-                      Rotation notes
-                      <input type="text" name="notes" placeholder="Optional notes" />
-                    </label>
-                    <button class="button-primary" type="submit">Log rotation</button>
-                  </form>
                 </div>
               `
               : ""
@@ -3317,26 +3494,32 @@ function getTireHealthMeta(tire, vehicle) {
     };
   }
 
-  const currentDepth = typeof tire.currentTreadDepth === "number" ? tire.currentTreadDepth : tire.treadDepth ?? null;
-  const startingDepth = typeof tire.startingTreadDepth === "number" ? tire.startingTreadDepth : currentDepth;
+  const currentDepth = getTireTreadRating(tire);
+  const startingDepth = normalizeTreadRating(
+    typeof tire.startingTreadDepth === "number" ? tire.startingTreadDepth : currentDepth
+  );
   const milesDriven = Math.max(vehicle.currentMileage - (tire.installMileage ?? vehicle.currentMileage), 0);
   const totalWear =
     typeof startingDepth === "number" && typeof currentDepth === "number" ? Math.max(startingDepth - currentDepth, 0) : 0;
   const wearRate = totalWear > 0 && milesDriven > 0 ? milesDriven / totalWear : null;
   const estimatedMilesRemaining =
-    wearRate && typeof currentDepth === "number" ? Math.max((currentDepth - 2) * wearRate, 0) : null;
+    wearRate && typeof currentDepth === "number"
+      ? Math.max((currentDepth - TREAD_RATING_MIN) * wearRate, 0)
+      : null;
+  const treadBadge = getTreadRatingBadgeMeta(currentDepth);
 
-  if (typeof currentDepth === "number" && currentDepth <= 2) {
-    return { status: "due", label: "Replace now", milesDriven, totalWear, estimatedMilesRemaining };
-  }
-  if (typeof currentDepth === "number" && currentDepth <= 6) {
-    return { status: "upcoming", label: "Due soon", milesDriven, totalWear, estimatedMilesRemaining };
-  }
-  return { status: "ok", label: "Good", milesDriven, totalWear, estimatedMilesRemaining };
+  return {
+    status: treadBadge.status,
+    label: treadBadge.label,
+    milesDriven,
+    totalWear,
+    estimatedMilesRemaining,
+  };
 }
 
 function logTreadDepthEntry(tire, entry) {
-  if (!(typeof entry.depth === "number")) {
+  const nextRating = normalizeTreadRating(entry.depth);
+  if (typeof nextRating !== "number") {
     return;
   }
 
@@ -3344,12 +3527,12 @@ function logTreadDepthEntry(tire, entry) {
   const alreadyLogged = tire.treadHistory[0];
   if (
     alreadyLogged &&
-    alreadyLogged.depth === entry.depth &&
+    normalizeTreadRating(alreadyLogged.depth ?? alreadyLogged.treadDepth) === nextRating &&
     alreadyLogged.mileage === entry.mileage &&
     alreadyLogged.date === entry.date
   ) {
-    tire.currentTreadDepth = entry.depth;
-    tire.treadDepth = entry.depth;
+    tire.currentTreadDepth = nextRating;
+    tire.treadDepth = nextRating;
     return;
   }
 
@@ -3357,13 +3540,13 @@ function logTreadDepthEntry(tire, entry) {
     tireId: tire.tireId,
     date: entry.date,
     mileage: entry.mileage,
-    treadDepth: entry.depth,
-    depth: entry.depth,
-    unit: "32nds",
+    treadDepth: nextRating,
+    depth: nextRating,
+    unit: "rating",
     notes: entry.notes || "",
   });
-  tire.currentTreadDepth = entry.depth;
-  tire.treadDepth = entry.depth;
+  tire.currentTreadDepth = nextRating;
+  tire.treadDepth = nextRating;
 }
 
 function appendPositionHistory(tire, nextPosition, date, mileage) {
@@ -3388,55 +3571,124 @@ function appendPositionHistory(tire, nextPosition, date, mileage) {
   tire.position = nextPosition;
 }
 
-function applyTireRotation(vehicle, { rotationType, notes, mileage, date }) {
-  if (!vehicle.tires) {
-    return;
+function getTireRotationMapping(rotationType, current) {
+  const normalizedType =
+    rotationType === "front-to-rear" || rotationType === "rear-to-front" ? "front-to-back" : rotationType;
+
+  if (normalizedType === "cross-rotation" || normalizedType === "cross") {
+    return {
+      frontLeft: current.rearRight,
+      frontRight: current.rearLeft,
+      rearLeft: current.frontRight,
+      rearRight: current.frontLeft,
+    };
   }
 
-  const current = { ...vehicle.tires };
-  const mapping =
-    rotationType === "cross-rotation"
-      ? {
-          frontLeft: current.rearRight,
-          frontRight: current.rearLeft,
-          rearLeft: current.frontRight,
-          rearRight: current.frontLeft,
-        }
-      : rotationType === "rear-to-front"
-        ? {
-            frontLeft: current.rearLeft,
-            frontRight: current.rearRight,
-            rearLeft: current.frontLeft,
-            rearRight: current.frontRight,
-          }
-        : {
-            frontLeft: current.rearLeft,
-            frontRight: current.rearRight,
-            rearLeft: current.frontLeft,
-            rearRight: current.frontRight,
-          };
+  if (normalizedType === "rearward-cross") {
+    return {
+      rearLeft: current.frontLeft,
+      rearRight: current.frontRight,
+      frontLeft: current.rearRight,
+      frontRight: current.rearLeft,
+    };
+  }
+
+  return {
+    rearLeft: current.frontLeft,
+    rearRight: current.frontRight,
+    frontLeft: current.rearLeft,
+    frontRight: current.rearRight,
+  };
+}
+
+function logTireMovement(vehicle, { tire, tireName, fromPosition, toPosition, date, mileage, notes, rotationType }) {
+  vehicle.tireMovementHistory = Array.isArray(vehicle.tireMovementHistory) ? vehicle.tireMovementHistory : [];
+  vehicle.tireMovementHistory.unshift({
+    id: crypto.randomUUID(),
+    vehicleId: vehicle.id,
+    date,
+    mileage,
+    tireId: tire?.tireId || tire?.id || null,
+    tireName: tireName || getTireDisplayName(tire),
+    fromPosition,
+    toPosition,
+    notes: notes || "",
+    rotationType: rotationType || "manual",
+  });
+}
+
+function findTireSourcePosition(previousByPosition, tire) {
+  if (!tire) {
+    return null;
+  }
+
+  const tireKey = tire.tireId || tire.id;
+  return (
+    TIRE_POSITIONS.find((candidate) => {
+      const previousTire = previousByPosition[candidate.key];
+      if (!previousTire) {
+        return false;
+      }
+      return (previousTire.tireId || previousTire.id) === tireKey;
+    })?.key ||
+    tire.position ||
+    null
+  );
+}
+
+function applyTirePositionMapping(vehicle, mapping, { rotationType, notes, mileage, date }) {
+  const previousByPosition = { ...(vehicle.tires || {}) };
+  const nextTires = { ...(vehicle.tires || {}) };
 
   TIRE_POSITIONS.forEach((position) => {
-    const tire = mapping[position.key];
+    const tire = mapping[position.key] ?? null;
     if (!tire) {
+      delete nextTires[position.key];
       return;
     }
-    tire.rotationHistory = Array.isArray(tire.rotationHistory) ? tire.rotationHistory : [];
-    tire.rotationHistory.unshift({
+
+    const fromPosition = findTireSourcePosition(previousByPosition, tire) || position.key;
+    const nextTire = normalizeTireRecord({ ...tire }, vehicle.id, position.key);
+    nextTire.rotationHistory = Array.isArray(nextTire.rotationHistory) ? nextTire.rotationHistory : [];
+    nextTire.rotationHistory.unshift({
       vehicleId: vehicle.id,
       date,
       mileage,
       rotationType,
       notes,
+      fromPosition,
       toPosition: position.key,
     });
-    tire.status = "rotated";
-    appendPositionHistory(tire, position.key, date, mileage);
-    tire.updatedAt = new Date().toISOString();
-    mapping[position.key] = normalizeTireRecord(tire, vehicle.id, position.key);
+    nextTire.status = "rotated";
+    appendPositionHistory(nextTire, position.key, date, mileage);
+    nextTire.updatedAt = new Date().toISOString();
+    nextTires[position.key] = nextTire;
+
+    if (fromPosition !== position.key) {
+      logTireMovement(vehicle, {
+        tire: nextTire,
+        fromPosition,
+        toPosition: position.key,
+        date,
+        mileage,
+        notes,
+        rotationType,
+      });
+    }
   });
 
-  vehicle.tires = mapping;
+  vehicle.tires = nextTires;
+}
+
+function applyTireRotation(vehicle, { rotationType, notes, mileage, date }) {
+  if (!vehicle.tires) {
+    vehicle.tires = {};
+  }
+
+  const current = { ...vehicle.tires };
+  const mapping = getTireRotationMapping(rotationType, current);
+  applyTirePositionMapping(vehicle, mapping, { rotationType, notes, mileage, date });
+
   vehicle.tireRotationHistory = Array.isArray(vehicle.tireRotationHistory) ? vehicle.tireRotationHistory : [];
   vehicle.tireRotationHistory.unshift({
     vehicleId: vehicle.id,
@@ -3444,6 +3696,38 @@ function applyTireRotation(vehicle, { rotationType, notes, mileage, date }) {
     mileage,
     rotationType,
     notes,
+  });
+}
+
+function applyManualTireMove(vehicle, fromPosition, toPosition, { notes, mileage, date }) {
+  if (!vehicle.tires) {
+    vehicle.tires = {};
+  }
+
+  const fromTire = vehicle.tires[fromPosition] ?? null;
+  const toTire = vehicle.tires[toPosition] ?? null;
+  if (!fromTire) {
+    return;
+  }
+
+  const mapping = { ...vehicle.tires };
+  mapping[toPosition] = fromTire;
+  mapping[fromPosition] = toTire;
+
+  applyTirePositionMapping(vehicle, mapping, {
+    rotationType: "manual",
+    notes,
+    mileage,
+    date,
+  });
+
+  vehicle.tireRotationHistory = Array.isArray(vehicle.tireRotationHistory) ? vehicle.tireRotationHistory : [];
+  vehicle.tireRotationHistory.unshift({
+    vehicleId: vehicle.id,
+    date,
+    mileage,
+    rotationType: "manual",
+    notes: notes || `Manual move: ${getTirePositionLabel(fromPosition)} to ${getTirePositionLabel(toPosition)}`,
   });
 }
 
@@ -3480,7 +3764,7 @@ function archiveReplacedTire(vehicle, position, tire, replacement) {
 function createReplacementTireRecord(payload) {
   const nextId = crypto.randomUUID();
   const installDate = payload.installDate || new Date().toISOString().slice(0, 10);
-  const installMileage = payload.installMileage || 0;
+  const installMileage = typeof payload.installMileage === "number" ? payload.installMileage : null;
   const nextTire = normalizeTireRecord(
     {
       ...payload,
@@ -3505,12 +3789,14 @@ function createReplacementTireRecord(payload) {
     payload.vehicleId,
     payload.position
   );
-  logTreadDepthEntry(nextTire, {
-    depth: payload.currentTreadDepth,
-    mileage: installMileage,
-    date: installDate,
-    notes: "Installed replacement tire",
-  });
+  if (typeof payload.currentTreadDepth === "number") {
+    logTreadDepthEntry(nextTire, {
+      depth: payload.currentTreadDepth,
+      mileage: installMileage ?? 0,
+      date: installDate,
+      notes: "Installed replacement tire",
+    });
+  }
   return nextTire;
 }
 
@@ -3524,30 +3810,103 @@ function garageTireNodeMarkup(vehicle, tire, position, activePosition) {
   return `
     <button class="garage-tire-node ${activePosition === position.key ? "is-active" : ""}" type="button" data-select-tire="${position.key}">
       <span>${shortLabelMap[position.key] || position.label}</span>
-      <strong>${typeof tire?.treadDepth === "number" ? `${tire.treadDepth}/32"` : "--"}</strong>
+      <strong>${formatTireTreadLabel(tire)}</strong>
     </button>
   `;
 }
 
-function buildTreadDepthOptionMarkup(selectedDepth) {
-  return [`<option value="">Select tread depth</option>`]
-    .concat(
-      TREAD_DEPTH_OPTIONS.map(
-        (depth) => `<option value="${depth}" ${selectedDepth === depth ? "selected" : ""}>${depth}/32"</option>`
-      )
-    )
-    .join("");
-}
-
 function buildTireTreadHistoryLabel(tire) {
+  const currentRating = getTireTreadRating(tire);
   if (!tire?.treadHistory?.length) {
-    return typeof tire?.treadDepth === "number" ? `${tire.treadDepth}/32" current reading` : "No tread history yet";
+    return typeof currentRating === "number" ? `${formatTreadRatingValue(currentRating)} current reading` : "No tread history yet";
   }
 
   return tire.treadHistory
     .slice(0, 3)
-    .map((entry) => `${entry.depth}/32" on ${safeFormatDate(entry.date)} at ${formatNumber(entry.mileage)} mi`)
+    .map((entry) => {
+      const rating = normalizeTreadRating(entry.depth ?? entry.treadDepth);
+      return `${formatTreadRatingValue(rating)} on ${safeFormatDate(entry.date)} at ${formatNumber(entry.mileage)} mi`;
+    })
     .join(" • ");
+}
+
+function buildTireMovementHistoryMarkup(vehicle) {
+  const history = Array.isArray(vehicle.tireMovementHistory) ? vehicle.tireMovementHistory : [];
+  if (!history.length) {
+    return `<p class="muted">No tire movements logged yet.</p>`;
+  }
+
+  return history
+    .slice(0, 12)
+    .map((entry) => {
+      const preset = ROTATION_PRESETS.find((item) => item.value === entry.rotationType);
+      const moveLabel = `${getTirePositionLabel(entry.fromPosition)} → ${getTirePositionLabel(entry.toPosition)}`;
+      return `
+        <div class="tire-movement-entry">
+          <strong>${safeFormatDate(entry.date)} • ${entry.tireName || "Tire"}</strong>
+          <span class="meta">${moveLabel}</span>
+          <span class="meta">${preset?.label || entry.rotationType || "Move"} • ${formatNumber(entry.mileage)} miles</span>
+          ${entry.notes ? `<span class="meta">${entry.notes}</span>` : ""}
+        </div>
+      `;
+    })
+    .join("");
+}
+
+function buildTireRotationPanelMarkup(vehicle) {
+  const rotationOptions = ROTATION_PRESETS.map(
+    (preset) => `<option value="${preset.value}">${preset.label}</option>`
+  ).join("");
+  const positionOptions = TIRE_POSITIONS.map((position) => `<option value="${position.key}">${position.label}</option>`).join(
+    ""
+  );
+
+  return `
+    <div class="tire-rotation-panel ${isTireRotationPanelOpen ? "" : "is-hidden"}">
+      <div class="vehicle-summary">
+        <div>
+          <strong>Rotate / Move Tires</strong>
+          <span class="meta">Tread rating, pressure, notes, install date, and mileage stay with each tire.</span>
+        </div>
+      </div>
+      <form class="form-grid" data-garage-rotation-form="${vehicle.id}">
+        <input type="hidden" name="vehicleId" value="${vehicle.id}" />
+        <label>
+          Rotation preset
+          <select name="rotationType" data-rotation-type-select>
+            ${rotationOptions}
+          </select>
+        </label>
+        <label>
+          Notes
+          <input type="text" name="notes" placeholder="Optional rotation notes" />
+        </label>
+        <div class="full-span form-grid is-hidden" data-manual-move-fields>
+          <label>
+            Move from
+            <select name="fromPosition">
+              <option value="">Select position</option>
+              ${positionOptions}
+            </select>
+          </label>
+          <label>
+            Move to
+            <select name="toPosition">
+              <option value="">Select position</option>
+              ${positionOptions}
+            </select>
+          </label>
+        </div>
+        <div class="full-span inline-row">
+          <button class="button-primary" type="submit">Apply tire move</button>
+        </div>
+      </form>
+      <div class="tire-movement-history">
+        <strong>Tire Movement History</strong>
+        ${buildTireMovementHistoryMarkup(vehicle)}
+      </div>
+    </div>
+  `;
 }
 
 function buildTirePositionHistoryLabel(tire) {
@@ -3765,7 +4124,7 @@ function buildHistoryTireDetailsMarkup(record) {
     record.tireDetails.brand && `Tire brand: ${record.tireDetails.brand}`,
     record.tireDetails.model && `Tire model: ${record.tireDetails.model}`,
     record.tireDetails.size && `Tire size: ${record.tireDetails.size}`,
-    record.tireDetails.treadDepth && `Tread depth: ${record.tireDetails.treadDepth}/32"`,
+    record.tireDetails.treadDepth && formatTreadRatingValue(normalizeTreadRating(record.tireDetails.treadDepth)),
     record.tireDetails.recommendedPressure && `Recommended pressure (PSI): ${record.tireDetails.recommendedPressure}`,
     positions && `Tire position replaced: ${positions}`,
   ]
@@ -3987,7 +4346,7 @@ function loadVisitIntoForm(records) {
     recordForm.elements.recordTireModel.value = leadTireDetails.model ?? "";
     recordForm.elements.recordTireType.value = leadTireDetails.type ?? "";
     recordForm.elements.recordTireSize.value = leadTireDetails.size ?? "";
-    recordForm.elements.recordTireTreadDepth.value = leadTireDetails.treadDepth ?? "";
+    recordForm.elements.recordTireTreadDepth.value = normalizeTreadRating(leadTireDetails.treadDepth) ?? "";
     recordForm.elements.recordTireWarrantyMiles.value = leadTireDetails.warrantyMiles ?? "";
     recordForm.elements.recordTireEstimatedReplacementMileage.value = leadTireDetails.estimatedReplacementMileage ?? "";
     recordForm.elements.recordTireRecommendedPressure.value = leadTireDetails.recommendedPressure ?? "";
@@ -4075,7 +4434,7 @@ function loadRecordIntoForm(record) {
     recordForm.elements.recordTireModel.value = record.tireDetails.model ?? "";
     recordForm.elements.recordTireType.value = record.tireDetails.type ?? "";
     recordForm.elements.recordTireSize.value = record.tireDetails.size ?? "";
-    recordForm.elements.recordTireTreadDepth.value = record.tireDetails.treadDepth ?? "";
+    recordForm.elements.recordTireTreadDepth.value = normalizeTreadRating(record.tireDetails.treadDepth) ?? "";
     recordForm.elements.recordTireWarrantyMiles.value = record.tireDetails.warrantyMiles ?? "";
     recordForm.elements.recordTireEstimatedReplacementMileage.value =
       record.tireDetails.estimatedReplacementMileage ?? "";
@@ -4176,28 +4535,38 @@ function setVehicleFormExpanded(expanded) {
 
 function loadTireIntoForm(vehicleId, position) {
   const vehicle = state.vehicles.find((item) => item.id === vehicleId);
-  const tire = vehicle?.tires?.[position];
-  if (!vehicle || !tire) {
+  if (!vehicle) {
     return;
   }
 
+  const tire = vehicle.tires?.[position] ?? null;
   editingTireKey = `${vehicleId}:${position}`;
+  tireEditForm.reset();
+  tireEditForm.elements.mode.value = "edit";
   tireEditForm.elements.vehicleId.value = vehicleId;
   tireEditForm.elements.position.value = position;
   tireEditForm.elements.vehicleLabel.value = `${vehicle.year} ${vehicle.make} ${vehicle.model}${vehicle.trim ? ` ${vehicle.trim}` : ""}`;
   tireEditForm.elements.positionLabel.value = TIRE_POSITIONS.find((item) => item.key === position)?.label ?? position;
-  tireEditForm.elements.installDate.value = tire.installDate ?? "";
-  tireEditForm.elements.installMileage.value = tire.installMileage ?? "";
-  tireEditForm.elements.installer.value = tire.installer ?? "";
-  tireEditForm.elements.brand.value = tire.brand ?? "";
-  tireEditForm.elements.model.value = tire.model ?? "";
-  tireEditForm.elements.type.value = tire.type ?? "";
-  tireEditForm.elements.size.value = tire.size ?? "";
-  tireEditForm.elements.treadDepth.value = tire.treadDepth ?? "";
-  tireEditForm.elements.warrantyMiles.value = tire.warrantyMiles ?? "";
-  tireEditForm.elements.estimatedReplacementMileage.value = tire.estimatedReplacementMileage ?? "";
-  tireEditForm.elements.recommendedPressure.value = tire.recommendedPressure ?? "";
-  tireEditForm.elements.notes.value = tire.notes ?? "";
+
+  if (tire) {
+    tireEditForm.elements.installDate.value = tire.installDate ?? "";
+    tireEditForm.elements.installMileage.value =
+      typeof tire.installMileage === "number" ? tire.installMileage : "";
+    tireEditForm.elements.installer.value = tire.installer ?? "";
+    tireEditForm.elements.brand.value = tire.brand ?? "";
+    tireEditForm.elements.model.value = tire.model ?? "";
+    tireEditForm.elements.type.value = tire.type ?? "";
+    tireEditForm.elements.size.value = tire.size ?? "";
+    tireEditForm.elements.treadDepth.value = getTireTreadRating(tire) ?? "";
+    tireEditForm.elements.warrantyMiles.value =
+      typeof tire.warrantyMiles === "number" ? tire.warrantyMiles : "";
+    tireEditForm.elements.estimatedReplacementMileage.value =
+      typeof tire.estimatedReplacementMileage === "number" ? tire.estimatedReplacementMileage : "";
+    tireEditForm.elements.recommendedPressure.value =
+      typeof tire.recommendedPressure === "number" ? tire.recommendedPressure : "";
+    tireEditForm.elements.notes.value = tire.notes ?? "";
+  }
+
   updateTireEditMode();
   setActiveScreen("garage");
   tireEditPanel.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -4330,11 +4699,13 @@ function tireCardMarkup(vehicle, tire, position) {
       : null;
   const tireLifeProgress = buildProgressMeta(milesOnTire, totalEstimatedLife);
   const tireName = [tire.brand, tire.model].filter(Boolean).join(" ") || "Brand/model not saved";
-  const treadDepth = formatTreadDepthValue(tire.startingTreadDepth ?? tire.treadDepth);
+  const treadRating = getTireTreadRating(tire);
+  const treadBadge = getTreadRatingBadgeMeta(treadRating);
+  const treadLabel = formatTreadRatingValue(treadRating);
   const summaryMeta = [
     tire.size || "Size not saved",
     typeof tire.recommendedPressure === "number" ? `${tire.recommendedPressure} PSI` : "PSI not saved",
-    treadDepth,
+    treadLabel,
   ].join(" • ");
 
   return `
@@ -4346,12 +4717,18 @@ function tireCardMarkup(vehicle, tire, position) {
           <span class="meta">${summaryMeta}</span>
         </span>
         <span class="tire-summary-mileage">${formatNumber(milesOnTire)} mi</span>
+        ${typeof treadRating === "number" ? statusPill(treadBadge.status, treadBadge.label) : ""}
       </summary>
       <div class="tire-dropdown-content">
+        <div class="tire-tread-badge-row">
+          <span class="meta">${treadLabel}</span>
+          ${typeof treadRating === "number" ? statusPill(treadBadge.status, treadBadge.label) : ""}
+        </div>
+        <span class="meta field-helper">Higher number = more tread left. Tread rating goes down as the tire wears.</span>
         <span class="meta">Tire ID: ${tire.tireId || "Not saved"}</span>
         <span class="meta">Brand / model: ${tireName}</span>
         <span class="meta">Size: ${tire.size || "Not saved"}</span>
-        <span class="meta">Starting tread depth: ${treadDepth}</span>
+        <span class="meta">Starting tread rating: ${formatTreadRatingValue(normalizeTreadRating(tire.startingTreadDepth ?? treadRating))}</span>
         <span class="meta">Install date: ${safeFormatDate(tire.installDate)}</span>
         <span class="meta">Install mileage: ${
           typeof tire.installMileage === "number" ? `${formatNumber(tire.installMileage)} miles` : "Not saved"
@@ -4391,7 +4768,7 @@ function tireCardMarkup(vehicle, tire, position) {
         }</span>
         <span class="meta">Miles driven on current tire: ${formatNumber(milesOnTire)}</span>
         <div class="tire-card-actions">
-          <button class="button-secondary" type="button" data-rotate-tires="${vehicle.id}">Rotate tires</button>
+          <button class="button-secondary" type="button" data-open-tire-rotation>Rotate / Move Tires</button>
           <button class="button-secondary" type="button" data-replace-tire="${position.key}" data-vehicle-id="${vehicle.id}">
             Replace tire
           </button>
@@ -4408,7 +4785,7 @@ function tireCardMarkup(vehicle, tire, position) {
 }
 
 function formatTreadDepthValue(value) {
-  return typeof value === "number" ? `${value}/32"` : "Not saved";
+  return formatTreadRatingValue(value);
 }
 
 function nextUpLogMarkup(item, order) {
@@ -4562,6 +4939,7 @@ function updateSchedulePlanMode() {
   schedulePlanSubmitButton.textContent = editingSchedulePlanKey ? "Update Plan" : "Save Plan";
   schedulePlanToggleButton.textContent = editingSchedulePlanKey ? "Edit recurring plan" : "Add custom plan";
   schedulePlanToggleButton.setAttribute("aria-expanded", String(isSchedulePlanExpanded));
+  schedulePlanDeleteButton?.classList.toggle("is-hidden", !editingSchedulePlanKey);
 }
 
 function resetSchedulePlanMode() {
@@ -4647,12 +5025,16 @@ function getDisplayRecurringPlans(vehicleId) {
   const overrides = state.recurringPlans.filter((plan) => plan.vehicleId === vehicleId);
   const templatePlans = RECURRING_SERVICE_TEMPLATES.map((template) => {
     const override = overrides.find((plan) => !plan.isCustom && plan.serviceKey === template.key);
+    if (override?.removed) {
+      return null;
+    }
+
     return {
       ...createDefaultRecurringPlan(vehicleId, template),
       ...override,
       planKey: template.key,
     };
-  });
+  }).filter(Boolean);
   const customPlans = overrides
     .filter((plan) => plan.isCustom)
     .map((plan) => ({
@@ -4960,15 +5342,6 @@ function renderServiceTypeOptions() {
     .join("");
 }
 
-function renderTreadDepthOptions() {
-  const options = [`<option value="">Select tread depth</option>`]
-    .concat(TREAD_DEPTH_OPTIONS.map((depth) => `<option value="${depth}">${depth}/32"</option>`))
-    .join("");
-
-  document.querySelector('#tireEditForm select[name="treadDepth"]').innerHTML = options;
-  document.querySelector('select[name="recordTireTreadDepth"]').innerHTML = options;
-}
-
 function seedCarfaxData() {
   const vehicleId = "vehicle-2015-honda-crv-3czrm3h50fg710298";
   const carfaxAlreadyImported =
@@ -5097,8 +5470,8 @@ function carfaxTire(position, vehicleId, overrides) {
               depth: startingTreadDepth,
               mileage: installMileage,
               date: installDate,
-              unit: "32nds",
-              notes: "Estimated new tire tread depth from CARFAX-derived entry.",
+              unit: "rating",
+              notes: "Estimated new tire tread rating from CARFAX-derived entry.",
             },
           ]
         : [],
@@ -5826,6 +6199,7 @@ function normalizeVehicleTireData(vehicle) {
     ...vehicle,
     archivedTires: Array.isArray(vehicle.archivedTires) ? vehicle.archivedTires : [],
     tireRotationHistory: Array.isArray(vehicle.tireRotationHistory) ? vehicle.tireRotationHistory : [],
+    tireMovementHistory: Array.isArray(vehicle.tireMovementHistory) ? vehicle.tireMovementHistory : [],
     documents: Array.isArray(vehicle.documents) ? vehicle.documents : [],
     tires: { ...(vehicle.tires || {}) },
   };
@@ -5843,18 +6217,20 @@ function normalizeVehicleTireData(vehicle) {
 }
 
 function normalizeTireRecord(tire, vehicleId, positionKey) {
-  const startingTreadDepth =
+  const startingTreadDepth = normalizeTreadRating(
     typeof tire.startingTreadDepth === "number"
       ? tire.startingTreadDepth
       : typeof tire.treadDepth === "number"
         ? tire.treadDepth
-        : tire.treadHistory?.[tire.treadHistory.length - 1]?.depth ?? null;
-  const currentTreadDepth =
+        : tire.treadHistory?.[tire.treadHistory.length - 1]?.depth ?? null
+  );
+  const currentTreadDepth = normalizeTreadRating(
     typeof tire.currentTreadDepth === "number"
       ? tire.currentTreadDepth
       : typeof tire.treadDepth === "number"
         ? tire.treadDepth
-        : tire.treadHistory?.[0]?.depth ?? null;
+        : tire.treadHistory?.[0]?.depth ?? null
+  );
 
   return {
     ...tire,
@@ -5864,8 +6240,19 @@ function normalizeTireRecord(tire, vehicleId, positionKey) {
     position: positionKey,
     startingTreadDepth,
     currentTreadDepth,
+    treadDepth: currentTreadDepth,
     status: tire.status || "active",
-    treadHistory: Array.isArray(tire.treadHistory) ? tire.treadHistory : [],
+    treadHistory: Array.isArray(tire.treadHistory)
+      ? tire.treadHistory.map((entry) => {
+          const rating = normalizeTreadRating(entry.depth ?? entry.treadDepth);
+          return {
+            ...entry,
+            depth: rating,
+            treadDepth: rating,
+            unit: "rating",
+          };
+        })
+      : [],
     positionHistory: Array.isArray(tire.positionHistory)
       ? tire.positionHistory
       : [
@@ -6081,7 +6468,7 @@ function buildVisitTireUpdate({ vehicleId, installDate, installMileage, shop, no
     model,
     type,
     size: cleanText(recordForm.elements.recordTireSize.value),
-    treadDepth: numericOrNull(recordForm.elements.recordTireTreadDepth.value),
+    treadDepth: parseTreadRatingInput(recordForm.elements.recordTireTreadDepth.value),
     warrantyMiles: numericOrNull(recordForm.elements.recordTireWarrantyMiles.value),
     estimatedReplacementMileage: numericOrNull(
       recordForm.elements.recordTireEstimatedReplacementMileage.value

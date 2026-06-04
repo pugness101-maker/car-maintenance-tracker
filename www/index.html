@@ -212,16 +212,36 @@
               </div>
               <form id="schedulePlanForm" class="form-grid">
                 <input type="hidden" name="planId" />
+                <input type="hidden" name="serviceId" />
+                <input type="hidden" name="serviceName" />
                 <input type="hidden" name="serviceKey" />
                 <input type="hidden" name="isCustom" />
                 <label>
                   Vehicle
                   <select name="vehicleId" required></select>
                 </label>
-                <label>
-                  Service name
-                  <input type="text" name="serviceName" list="serviceTypeOptions" required />
-                </label>
+                <div class="full-span service-builder">
+                  <div class="service-builder-header">
+                    <h3>Service name</h3>
+                    <span class="meta">Choose one service for this recurring plan.</span>
+                  </div>
+                  <label>
+                    Search services
+                    <input id="schedulePlanServiceSearchInput" type="text" placeholder="Search service name" />
+                  </label>
+                  <div id="schedulePlanServiceChecklist" class="service-checklist history-quick-checklist"></div>
+                  <div class="custom-service-entry">
+                    <input
+                      id="schedulePlanCustomServiceInput"
+                      type="text"
+                      list="serviceTypeOptions"
+                      placeholder="Type a custom service if needed"
+                    />
+                    <button id="schedulePlanAddCustomServiceButton" class="button-secondary" type="button">
+                      Add custom
+                    </button>
+                  </div>
+                </div>
                 <label>
                   Category
                   <select name="category" required></select>
@@ -453,47 +473,10 @@
                 </select>
               </label>
             </div>
-            <div class="history-top-actions">
-              <div>
-                <strong>Service Actions</strong>
-                <span id="historyTopActionTarget" class="meta">No matching services yet.</span>
-              </div>
-              <div class="inline-row">
-                <button id="historyTopAddButton" class="button-primary" type="button">Add Service</button>
-                <button id="historyTopEditButton" class="button-secondary" type="button">Edit Top Result</button>
-                <button id="historyTopDeleteButton" class="button-ghost" type="button">Remove Top Result</button>
-              </div>
-            </div>
-            <div class="subpanel">
-              <details class="schedule-section-dropdown">
-                <summary class="schedule-section-summary">Service Names</summary>
-                <div class="service-name-manager-body">
-                  <span class="meta">Search all services, turn service names on or off, and edit or remove custom names.</span>
-                  <div class="form-grid">
-                    <label>
-                      Service name
-                      <input id="customServiceInput" type="text" list="serviceTypeOptions" placeholder="Add or rename a service name" />
-                    </label>
-                    <label>
-                      Category
-                      <select id="serviceNameManagerCategorySelect"></select>
-                    </label>
-                    <label class="full-span">
-                      Notes
-                      <textarea id="serviceNameManagerNotesInput" rows="2" placeholder="Optional service notes"></textarea>
-                    </label>
-                  </div>
-                  <div class="inline-row">
-                    <button id="addCustomServiceButton" class="button-secondary" type="button">Add service</button>
-                    <button id="serviceNameManagerCancelButton" class="button-secondary is-hidden" type="button">Cancel</button>
-                  </div>
-                  <label>
-                    Search services
-                    <input id="serviceNameManagerSearchInput" type="text" placeholder="Search all services" />
-                  </label>
-                  <div id="serviceNameManagerList" class="service-checklist empty-state"></div>
-                </div>
-              </details>
+            <div class="history-add-action">
+              <button id="recordFormToggleButton" class="button-primary" type="button" aria-expanded="false">
+                + Add Service
+              </button>
             </div>
             <div id="recordFormPanel" class="is-hidden">
             <div id="recordEditNotice" class="timeline-item is-hidden">
@@ -530,12 +513,12 @@
                 <input type="date" name="serviceDate" required />
               </label>
               <label>
-                Mileage
-                <input type="number" name="serviceMileage" min="0" step="1" required />
-              </label>
-              <label>
                 Cost
                 <input type="number" name="cost" min="0" step="0.01" placeholder="89.99" />
+              </label>
+              <label>
+                Mileage (optional)
+                <input type="number" name="serviceMileage" min="0" step="1" />
               </label>
               <label>
                 Shop / mechanic
@@ -550,19 +533,9 @@
                 ></textarea>
               </label>
               <label class="full-span">
-                Receipt / photo
+                Receipt / photo (optional)
                 <input name="receipt" type="file" accept="image/*,.pdf" />
               </label>
-              <div class="full-span inline-row">
-                <label>
-                  Repeat every X miles
-                  <input type="number" name="repeatMiles" min="0" step="1" placeholder="5000" />
-                </label>
-                <label>
-                  Repeat every X months
-                  <input type="number" name="repeatMonths" min="0" step="1" placeholder="6" />
-                </label>
-              </div>
 
               <div id="recordTireSection" class="full-span service-builder tire-service-panel is-hidden">
                 <div class="service-builder-header">
@@ -649,32 +622,37 @@
               </div>
             </form>
             </div>
-            <div class="floating-action-row">
-              <button id="historyQuickAddToggleButton" class="button-secondary floating-action-button" type="button" aria-expanded="false">
-                Quick Add
-              </button>
-              <button id="recordFormToggleButton" class="button-primary floating-action-button" type="button" aria-expanded="false">
-                + Add Service
-              </button>
+            <div class="subpanel">
+              <details class="schedule-section-dropdown">
+                <summary class="schedule-section-summary">Service Names</summary>
+                <div class="service-name-manager-body">
+                  <span class="meta">Search all services, turn service names on or off, and edit or remove custom names.</span>
+                  <div class="form-grid">
+                    <label>
+                      Service name
+                      <input id="customServiceInput" type="text" list="serviceTypeOptions" placeholder="Add or rename a service name" />
+                    </label>
+                    <label>
+                      Category
+                      <select id="serviceNameManagerCategorySelect"></select>
+                    </label>
+                    <label class="full-span">
+                      Notes
+                      <textarea id="serviceNameManagerNotesInput" rows="2" placeholder="Optional service notes"></textarea>
+                    </label>
+                  </div>
+                  <div class="inline-row">
+                    <button id="addCustomServiceButton" class="button-secondary" type="button">Add service</button>
+                    <button id="serviceNameManagerCancelButton" class="button-secondary is-hidden" type="button">Cancel</button>
+                  </div>
+                  <label>
+                    Search services
+                    <input id="serviceNameManagerSearchInput" type="text" placeholder="Search all services" />
+                  </label>
+                  <div id="serviceNameManagerList" class="service-checklist empty-state"></div>
+                </div>
+              </details>
             </div>
-            <section id="historyQuickAddPanel" class="panel is-hidden">
-              <div class="service-builder-header">
-                <h3>Quick Add Service</h3>
-                <span class="meta">Search a common service or type a custom one to prefill the maintenance form.</span>
-              </div>
-              <div class="quick-service-picker">
-                <label>
-                  Search or type service name
-                  <input
-                    id="historyQuickServiceSearchInput"
-                    type="text"
-                    autocomplete="off"
-                    placeholder="Oil change, brake pads, engine diagnostic..."
-                  />
-                </label>
-                <div id="historyQuickServiceChecklist" class="quick-service-results"></div>
-              </div>
-            </section>
           </section>
 
           <section class="panel">

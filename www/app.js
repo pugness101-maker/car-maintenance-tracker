@@ -449,8 +449,6 @@ const recordServiceChecklist = document.querySelector("#recordServiceChecklist")
 const recordServiceSearchInput = document.querySelector("#recordServiceSearchInput");
 const recordCustomServiceInput = document.querySelector("#recordCustomServiceInput");
 const recordAddCustomServiceButton = document.querySelector("#recordAddCustomServiceButton");
-const historyQuickServiceChecklist = document.querySelector("#historyQuickServiceChecklist");
-const historyQuickServiceSearchInput = document.querySelector("#historyQuickServiceSearchInput");
 const serviceChecklist = document.querySelector("#serviceChecklist");
 const selectedServicesList = document.querySelector("#selectedServicesList");
 const customServiceInput = document.querySelector("#customServiceInput");
@@ -467,10 +465,6 @@ const historyCategoryFilter = document.querySelector("#historyCategoryFilter");
 const historyDateFrom = document.querySelector("#historyDateFrom");
 const historyDateTo = document.querySelector("#historyDateTo");
 const historySortSelect = document.querySelector("#historySortSelect");
-const historyTopAddButton = document.querySelector("#historyTopAddButton");
-const historyTopEditButton = document.querySelector("#historyTopEditButton");
-const historyTopDeleteButton = document.querySelector("#historyTopDeleteButton");
-const historyTopActionTarget = document.querySelector("#historyTopActionTarget");
 const serviceTypeOptions = document.querySelector("#serviceTypeOptions");
 const dashboardVehicleSelect = document.querySelector("#dashboardVehicleSelect");
 const garageVehicleSelect = document.querySelector("#garageVehicleSelect");
@@ -489,6 +483,10 @@ const scheduleStatusFilter = document.querySelector("#scheduleStatusFilter");
 const schedulePlanToggleButton = document.querySelector("#schedulePlanToggleButton");
 const schedulePlanPanel = document.querySelector("#schedulePlanPanel");
 const schedulePlanForm = document.querySelector("#schedulePlanForm");
+const schedulePlanServiceChecklist = document.querySelector("#schedulePlanServiceChecklist");
+const schedulePlanServiceSearchInput = document.querySelector("#schedulePlanServiceSearchInput");
+const schedulePlanCustomServiceInput = document.querySelector("#schedulePlanCustomServiceInput");
+const schedulePlanAddCustomServiceButton = document.querySelector("#schedulePlanAddCustomServiceButton");
 const schedulePlanTitle = document.querySelector("#schedulePlanTitle");
 const schedulePlanSubmitButton = document.querySelector("#schedulePlanSubmitButton");
 const schedulePlanCancelButton = document.querySelector("#schedulePlanCancelButton");
@@ -506,8 +504,6 @@ const tireEditCancelButton = document.querySelector("#tireEditCancelButton");
 const historyList = document.querySelector("#historyList");
 const historyTimeline = document.querySelector("#historyTimeline");
 const historyViewToggle = document.querySelector("#historyViewToggle");
-const historyQuickAddPanel = document.querySelector("#historyQuickAddPanel");
-const historyQuickAddToggleButton = document.querySelector("#historyQuickAddToggleButton");
 const historyLogSection = document.querySelector("#historyLogSection");
 const recordVehicleSelect = document.querySelector("#recordVehicleSelect");
 const recordFormPanel = document.querySelector("#recordFormPanel");
@@ -520,7 +516,6 @@ const screenButtons = [...document.querySelectorAll("[data-screen-target]")];
 const screens = [...document.querySelectorAll("[data-screen]")];
 let editingVisitRecordIds = [];
 let isRecordFormExpanded = false;
-let isHistoryQuickAddExpanded = false;
 let editingCustomServiceName = null;
 let editingServiceDefinitionKey = null;
 let editingVehicleId = null;
@@ -557,14 +552,10 @@ function bindEvents() {
   historyTimeline.addEventListener("click", handleHistoryListClick);
   historyViewToggle.addEventListener("click", handleHistoryViewToggleClick);
   recordCancelEditButton.addEventListener("click", resetRecordFormMode);
-  historyTopAddButton.addEventListener("click", handleHistoryTopAdd);
-  historyTopEditButton.addEventListener("click", handleHistoryTopEdit);
-  historyTopDeleteButton.addEventListener("click", handleHistoryTopDelete);
   vehicleCancelEditButton.addEventListener("click", resetVehicleFormMode);
   vehicleFormToggleButton.addEventListener("click", () => setVehicleFormExpanded(!isVehicleFormExpanded));
   tireEditCancelButton.addEventListener("click", resetTireEditMode);
-  recordFormToggleButton.addEventListener("click", () => setRecordFormExpanded(!isRecordFormExpanded));
-  historyQuickAddToggleButton.addEventListener("click", () => setHistoryQuickAddExpanded(!isHistoryQuickAddExpanded));
+  recordFormToggleButton?.addEventListener("click", () => setRecordFormExpanded(!isRecordFormExpanded));
   dashboardVehicleList.addEventListener("click", handleDashboardVehicleListClick);
   schedulePlanForm.addEventListener("submit", handleSchedulePlanSubmit);
   schedulePlanToggleButton.addEventListener("click", () => {
@@ -577,6 +568,15 @@ function bindEvents() {
   schedulePlanCancelButton.addEventListener("click", resetSchedulePlanMode);
   schedulePlanDeleteButton.addEventListener("click", handleSchedulePlanDelete);
   scheduleVehicleSelect.addEventListener("change", handleScheduleVehicleChange);
+  if (schedulePlanServiceChecklist) {
+    schedulePlanServiceChecklist.addEventListener("change", handleSchedulePlanServiceChecklistChange);
+  }
+  if (schedulePlanServiceSearchInput) {
+    schedulePlanServiceSearchInput.addEventListener("input", renderSchedulePlanServiceChecklist);
+  }
+  if (schedulePlanAddCustomServiceButton) {
+    schedulePlanAddCustomServiceButton.addEventListener("click", handleSchedulePlanAddCustomService);
+  }
   dashboardVehicleSelect.addEventListener("change", handleDashboardVehicleChange);
   garageVehicleSelect.addEventListener("change", handleGarageVehicleChange);
   scheduleCategoryFilter.addEventListener("change", () => {
@@ -647,13 +647,6 @@ function bindEvents() {
   }
   if (selectedServicesList) {
     selectedServicesList.addEventListener("click", handleSelectedServicesClick);
-  }
-  if (historyQuickServiceChecklist) {
-    historyQuickServiceChecklist.addEventListener("click", handleHistoryQuickServicePick);
-  }
-  if (historyQuickServiceSearchInput) {
-    historyQuickServiceSearchInput.addEventListener("input", renderHistoryQuickServiceChecklist);
-    historyQuickServiceSearchInput.addEventListener("keydown", handleHistoryQuickServiceSearchKeydown);
   }
   if (recordServiceChecklist) {
     recordServiceChecklist.addEventListener("change", handleRecordServiceChecklistChange);
@@ -791,7 +784,7 @@ function applyImportedState(importedState) {
 function renderAllStaticOptions() {
   renderServiceTypeOptions();
   renderRecordServiceChecklist();
-  renderHistoryQuickServiceChecklist();
+  renderSchedulePlanServiceChecklist();
   renderHistoryCategoryOptions();
   renderScheduleCategoryOptions();
   restoreUiStateControls();
@@ -828,6 +821,7 @@ function handleVehicleSubmit(event) {
         ...state.vehicles[vehicleIndex],
         ...vehiclePayload,
       };
+      syncTireTreadRatings(state.vehicles[vehicleIndex]);
     }
   } else {
     state.vehicles.unshift({
@@ -952,7 +946,6 @@ function handleRecordServiceTypeChange() {
     recordForm.elements.serviceType.value = "";
     setRecordCategoryValue("Custom");
     renderRecordServiceChecklist();
-    renderHistoryQuickServiceChecklist();
     syncRecordTireSection();
     return;
   }
@@ -962,7 +955,6 @@ function handleRecordServiceTypeChange() {
   setRecordCategoryValue(getAutoCategoryForSelectedServices(serviceTypes));
   syncRecordTireSection();
   renderRecordServiceChecklist();
-  renderHistoryQuickServiceChecklist();
 }
 
 function handleRecordServiceChecklistChange(event) {
@@ -986,48 +978,6 @@ function handleRecordAddCustomService() {
   renderServiceTypeOptions();
   renderRecordServiceChecklist();
   handleRecordServiceTypeChange();
-}
-
-function handleHistoryQuickServicePick(event) {
-  const pickButton = event.target.closest("[data-quick-service]");
-  if (!pickButton) {
-    return;
-  }
-
-  applyHistoryQuickService(pickButton.dataset.quickService);
-}
-
-function handleHistoryQuickServiceSearchKeydown(event) {
-  if (event.key !== "Enter") {
-    return;
-  }
-
-  event.preventDefault();
-  applyHistoryQuickService(historyQuickServiceSearchInput.value);
-}
-
-function applyHistoryQuickService(serviceType) {
-  const normalized = cleanText(serviceType);
-  if (!normalized) {
-    return;
-  }
-
-  const canonicalService = getCanonicalServiceType(normalized);
-  registerCustomServiceType(canonicalService);
-  renderServiceTypeOptions();
-  renderHistoryCategoryOptions();
-  renderScheduleCategoryOptions();
-  recordCustomServiceInput.value = canonicalService;
-  recordForm.elements.serviceType.value = canonicalService;
-  setRecordCategoryValue(getAutoServiceCategory(canonicalService));
-  renderRecordServiceChecklist();
-  renderHistoryQuickServiceChecklist();
-  setRecordFormExpanded(true);
-  setHistoryQuickAddExpanded(false);
-  syncRecordTireSection();
-  if (historyQuickServiceSearchInput) {
-    historyQuickServiceSearchInput.value = "";
-  }
 }
 
 function syncRecordTirePositionMode() {
@@ -1084,6 +1034,18 @@ function handleScheduleScreenClick(event) {
       resetSchedulePlanMode();
     }
     render();
+    return;
+  }
+
+  const logPlanButton = event.target.closest("[data-log-recurring-plan]");
+  if (logPlanButton) {
+    openPlanServiceLog(logPlanButton.dataset.logRecurringPlan);
+    return;
+  }
+
+  const planCard = event.target.closest("[data-plan-card]");
+  if (planCard && !event.target.closest("button")) {
+    openPlanServiceLog(planCard.dataset.planCard);
   }
 }
 
@@ -1141,28 +1103,32 @@ function handleSchedulePlanSubmit(event) {
   const formData = new FormData(schedulePlanForm);
   const planId = cleanText(formData.get("planId"));
   const rawServiceKey = cleanText(formData.get("serviceKey"));
+  const serviceId = cleanText(formData.get("serviceId"));
   const serviceName = cleanText(formData.get("serviceName"));
   const category = cleanText(formData.get("category"));
   const intervalType = cleanText(formData.get("intervalType"));
   const vehicleId = cleanText(schedulePlanForm.elements.vehicleId.value) || getActiveScheduleVehicleId();
+  const serviceDefinition = getServiceDefinitionById(serviceId) ?? getServiceDefinition(serviceName);
 
-  if (!vehicleId || !serviceName || !category || !intervalType) {
+  if (!vehicleId || !serviceDefinition || !category || !intervalType) {
+    alert("Select a service, category, and interval type for this plan.");
     return;
   }
 
-  const matchingTemplate = getRecurringTemplateByKey(rawServiceKey) ?? getRecurringTemplateByName(serviceName);
-  const isCustom = formData.get("isCustom") === "true" || !matchingTemplate;
+  const matchingTemplate = getRecurringTemplateByName(serviceDefinition.name);
+  const isCustom = !matchingTemplate || formData.get("isCustom") === "true";
   const repeatMiles = numericOrNull(formData.get("repeatMiles"));
   const repeatMonths = numericOrNull(formData.get("repeatMonths"));
   const nextId = planId || crypto.randomUUID();
-  const serviceKey = isCustom ? rawServiceKey || `custom:${nextId}` : matchingTemplate.key;
+  const serviceKey = isCustom ? rawServiceKey || serviceDefinition.id : matchingTemplate.key;
 
   const planPayload = {
     id: nextId,
     vehicleId,
+    serviceId: serviceDefinition.id,
     serviceKey,
-    serviceName: matchingTemplate?.serviceName ?? serviceName,
-    category: matchingTemplate?.category ?? category,
+    serviceName: serviceDefinition.name,
+    category: serviceDefinition.category || category,
     intervalType,
     repeatMiles,
     repeatMonths,
@@ -1258,6 +1224,13 @@ function handleVehicleListClick(event) {
       return;
     }
 
+    if (isTireReplacementService(record.serviceType) && record.tireDetails) {
+      const vehicle = state.vehicles.find((item) => item.id === record.vehicleId);
+      if (vehicle) {
+        revertTireReplacementFromService(vehicle, record);
+      }
+    }
+
     state.records = state.records.filter((item) => item.id !== recordId);
     if (editingVisitRecordIds.includes(recordId)) {
       resetRecordFormMode();
@@ -1308,23 +1281,6 @@ function handleVehicleListClick(event) {
   const replaceTireButton = event.target.closest("[data-replace-tire]");
   if (replaceTireButton) {
     loadTireIntoForm(replaceTireButton.dataset.vehicleId, replaceTireButton.dataset.replaceTire);
-    return;
-  }
-
-  const saveReminderButton = event.target.closest("[data-save-reminder]");
-  if (saveReminderButton) {
-    const recordId = saveReminderButton.dataset.saveReminder;
-    const record = state.records.find((item) => item.id === recordId);
-    if (!record) {
-      return;
-    }
-
-    const milesInput = vehicleList.querySelector(`[data-reminder-miles="${recordId}"]`);
-    const monthsInput = vehicleList.querySelector(`[data-reminder-months="${recordId}"]`);
-    record.repeatMiles = numericOrNull(milesInput?.value);
-    record.repeatMonths = numericOrNull(monthsInput?.value);
-    persist();
-    render();
     return;
   }
 
@@ -1498,9 +1454,8 @@ function handleTireEditSubmit(event) {
     type: cleanText(formData.get("type")),
     size: cleanText(formData.get("size")),
     treadDepth: nextTreadDepth,
-    currentTreadDepth: nextTreadDepth,
     startingTreadDepth:
-      nextTreadDepth ?? normalizeTreadRating(existingTire.startingTreadDepth) ?? null,
+      nextTreadDepth ?? getStartingTreadRating(existingTire) ?? null,
     warrantyMiles: numericOrNull(formData.get("warrantyMiles")),
     estimatedReplacementMileage: numericOrNull(formData.get("estimatedReplacementMileage")),
     recommendedPressure: numericOrNull(formData.get("recommendedPressure")),
@@ -1520,7 +1475,7 @@ function handleTireEditSubmit(event) {
       cost: numericOrNull(formData.get("replacementCost")),
       notes: basePayload.notes,
     });
-    vehicle.tires[position] = createReplacementTireRecord(basePayload);
+    setActiveTireForPosition(vehicle, position, createReplacementTireRecord(basePayload));
   } else {
     const nextTire = normalizeTireRecord(
       {
@@ -1534,17 +1489,11 @@ function handleTireEditSubmit(event) {
       vehicleId,
       position
     );
-    if (typeof nextTreadDepth === "number") {
-      logTreadDepthEntry(nextTire, {
-        depth: nextTreadDepth,
-        mileage: basePayload.installMileage ?? vehicle.currentMileage,
-        date: basePayload.installDate || new Date().toISOString().slice(0, 10),
-        notes: "Saved from tire editor",
-      });
-    }
     vehicle.tires[position] = nextTire;
+    vehicle[getActiveTireIdKey(position)] = nextTire.tireId ?? nextTire.id ?? null;
   }
 
+  syncTireTreadRatings(vehicle);
   activeGarageTirePosition = position;
   if (typeof vehicle.tires[position]?.installMileage === "number") {
     syncVehicleMileage(vehicleId, vehicle.tires[position].installMileage);
@@ -1560,7 +1509,7 @@ async function handleRecordSubmit(event) {
   const vehicleId = getActiveAppVehicleId();
   const serviceTypes = getSelectedRecordServiceTypes();
   const serviceDate = formData.get("serviceDate");
-  const serviceMileage = Number(formData.get("serviceMileage"));
+  const serviceMileage = numericOrNull(formData.get("serviceMileage"));
   const shop = cleanText(formData.get("shop"));
   const cost = numericOrNull(formData.get("cost"));
   const notes = cleanText(formData.get("notes"));
@@ -1601,16 +1550,22 @@ async function handleRecordSubmit(event) {
 
   const previousRecord = existingVisitRecords[0] ?? null;
   const receiptName = receiptFile instanceof File && receiptFile.size ? receiptFile.name : previousRecord?.receiptName ?? "";
-  const nextRecords = serviceTypes.map((serviceType, index) => ({
+  const nextRecords = serviceTypes.map((serviceType, index) => {
+    const serviceDefinition = getServiceDefinition(serviceType);
+    return {
     id: existingVisitRecords[index]?.id ?? crypto.randomUUID(),
     vehicleId,
+    serviceId:
+      serviceDefinition?.id ??
+      existingVisitRecords[index]?.serviceId ??
+      (index === 0 ? cleanText(recordForm.dataset.serviceId) || null : null),
     serviceType,
     category: useManualCategory ? submittedCategory || getServiceCategory(serviceType) : getAutoServiceCategory(serviceType),
     serviceDate,
     mileageAtService: serviceMileage,
-    repeatMiles: numericOrNull(formData.get("repeatMiles")) ?? getExistingReminderValue(serviceType, "repeatMiles"),
-    repeatMonths: numericOrNull(formData.get("repeatMonths")) ?? getExistingReminderValue(serviceType, "repeatMonths"),
-    cost,
+    repeatMiles: existingVisitRecords[index]?.repeatMiles ?? null,
+    repeatMonths: existingVisitRecords[index]?.repeatMonths ?? null,
+    cost: resolveServiceRecordCost(index, serviceTypes.length, cost),
     shop,
     notes,
     tireDetails: isTireRelatedService(serviceType) ? sharedTireDetails : null,
@@ -1618,7 +1573,9 @@ async function handleRecordSubmit(event) {
     receiptData: receiptData ?? previousRecord?.receiptData ?? "",
     createdAt: existingVisitRecords[index]?.createdAt ?? new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-  }));
+    linkedPlanId: index === 0 ? cleanText(recordForm.dataset.linkedPlanId) || null : null,
+  };
+  });
 
   if (existingVisitRecords.length) {
     const editingRecordIds = new Set(editingVisitRecordIds);
@@ -1626,6 +1583,39 @@ async function handleRecordSubmit(event) {
   }
   state.records.unshift(...nextRecords);
   syncRecurringPlansFromLoggedServices(vehicleId, nextRecords);
+
+  const vehicle = state.vehicles.find((item) => item.id === vehicleId);
+  if (vehicle) {
+    existingVisitRecords.forEach((existingRecord) => {
+      if (!isTireReplacementService(existingRecord.serviceType) || !existingRecord.tireDetails) {
+        return;
+      }
+
+      const updatedRecord = nextRecords.find((record) => record.id === existingRecord.id);
+      const stillPresent = Boolean(updatedRecord && isTireReplacementService(updatedRecord.serviceType));
+      if (!stillPresent) {
+        revertTireReplacementFromService(vehicle, existingRecord);
+        return;
+      }
+
+      if (tireReplacementDetailsChanged(existingRecord.tireDetails, updatedRecord.tireDetails)) {
+        revertTireReplacementFromService(vehicle, existingRecord);
+      }
+    });
+
+    nextRecords.forEach((record) => {
+      if (!isTireReplacementService(record.serviceType) || !record.tireDetails) {
+        return;
+      }
+
+      const existingRecord = existingVisitRecords.find((item) => item.id === record.id) ?? null;
+      if (existingRecord && !tireReplacementDetailsChanged(existingRecord.tireDetails, record.tireDetails)) {
+        return;
+      }
+
+      applyTireReplacementFromService(vehicle, record);
+    });
+  }
 
   syncVehicleMileage(vehicleId, serviceMileage);
   persist();
@@ -1721,6 +1711,13 @@ function handleHistoryListClick(event) {
 
   if (!confirmed) {
     return;
+  }
+
+  if (isTireReplacementService(record.serviceType) && record.tireDetails) {
+    const vehicle = state.vehicles.find((item) => item.id === record.vehicleId);
+    if (vehicle) {
+      revertTireReplacementFromService(vehicle, record);
+    }
   }
 
   state.records = state.records.filter((item) => item.id !== recordId);
@@ -2011,7 +2008,6 @@ function checkServiceTypes(serviceTypes) {
     });
     recordForm.elements.serviceType.value = normalizedServices[0] ?? "";
     syncRecordTireSection();
-    renderHistoryQuickServiceChecklist();
     return;
   }
 
@@ -2163,6 +2159,7 @@ function deleteCustomService(serviceType) {
 function render() {
   repairOrphanedVehicleLinks();
   repairCanonicalServiceNames();
+  migrateServiceAndPlanLinks();
   renderVehicleSelects();
   renderHistoryCategoryOptions();
   renderScheduleCategoryOptions();
@@ -2289,111 +2286,159 @@ function renderHistoryCategoryOptions() {
   }
 }
 
-function getHistoryQuickPreferredServices() {
-  return [
-    "Oil change",
-    "Tire rotation",
-    "Brake inspection",
-    "Vehicle inspection",
-    "Tire pressure check",
-    "Air filter replacement",
-    "Cabin air filter replacement",
-    "Brake pads",
-    "Battery replacement",
-    "Alignment",
-    "Coolant flush",
-    "Transmission fluid",
-    "Spark plugs",
-    "Wiper blades",
-    "Engine diagnostic",
-  ];
-}
-
-function getHistoryQuickServiceSuggestions() {
-  return mergeUniqueText(getHistoryQuickPreferredServices(), getAvailableServiceTypes());
-}
-
-function getHistoryQuickServiceMatches(query) {
-  const normalizedQuery = cleanText(query).toLowerCase();
-  const suggestions = getHistoryQuickServiceSuggestions();
-  if (!normalizedQuery) {
-    const preferredSet = new Set(getHistoryQuickPreferredServices().map((serviceType) => serviceType.toLowerCase()));
-    return suggestions.filter((serviceType) => preferredSet.has(serviceType.toLowerCase())).slice(0, 15);
-  }
-
-  return suggestions
-    .filter((serviceType) => serviceType.toLowerCase().includes(normalizedQuery))
-    .sort((a, b) => a.localeCompare(b))
-    .slice(0, 12);
-}
-
-function renderHistoryQuickServiceChecklist() {
-  if (!historyQuickServiceChecklist) {
-    return;
-  }
-
-  const query = cleanText(historyQuickServiceSearchInput?.value);
-  const selectedService = cleanText(recordForm?.elements?.serviceType?.value);
-  const matches = getHistoryQuickServiceMatches(query);
-  const hasExactMatch = matches.some((serviceType) => serviceType.toLowerCase() === query.toLowerCase());
-  const options = mergeUniqueText(matches, query && !hasExactMatch ? [query] : []);
-
-  historyQuickServiceChecklist.innerHTML = options.length
-    ? options
-        .map((serviceType) => {
-          const isCustom = query && serviceType.toLowerCase() === query.toLowerCase() && !hasExactMatch;
-          const isSelected = selectedService.toLowerCase() === serviceType.toLowerCase();
-          return `
-            <button class="quick-service-option ${isSelected ? "is-active" : ""}" type="button" data-quick-service="${serviceType}">
-              <strong>${isCustom ? `Use "${serviceType}"` : serviceType}</strong>
-              <span class="meta">${isCustom ? "Custom service" : getAutoServiceCategory(serviceType)}</span>
-            </button>
-          `;
-        })
-        .join("")
-    : `<p class="muted">No matches. Type a service name and press Enter to use it.</p>`;
-}
-
 function renderRecordServiceChecklist() {
   if (!recordServiceChecklist) {
     return;
   }
 
-  const searchValue = cleanText(recordServiceSearchInput?.value).toLowerCase();
-  const selectedServices = new Set(getSelectedRecordServiceTypes().map((serviceType) => serviceType.toLowerCase()));
-  const commonServices = getAvailableServiceTypes()
+  const selectedServices = getSelectedRecordServiceTypes();
+  recordServiceChecklist.innerHTML = buildServiceChecklistMarkup({
+    services: getFilteredAvailableServices(recordServiceSearchInput?.value, selectedServices),
+    selectedNames: selectedServices,
+    inputName: "recordServiceType",
+  });
+}
+
+function renderSchedulePlanServiceChecklist() {
+  if (!schedulePlanServiceChecklist) {
+    return;
+  }
+
+  const selectedServiceName = cleanText(schedulePlanForm?.elements?.serviceName?.value);
+  const selectedNames = selectedServiceName ? [selectedServiceName] : [];
+  schedulePlanServiceChecklist.innerHTML = buildServiceChecklistMarkup({
+    services: getFilteredAvailableServices(schedulePlanServiceSearchInput?.value, selectedNames),
+    selectedNames,
+    inputName: "schedulePlanServiceType",
+  });
+}
+
+function getFilteredAvailableServices(searchValue, selectedNames = []) {
+  const search = cleanText(searchValue).toLowerCase();
+  const selectedSet = new Set(selectedNames.map((name) => name.toLowerCase()));
+
+  return getAvailableServiceTypes()
     .filter((serviceType) => {
-      if (!searchValue) {
+      if (!search) {
         return true;
       }
+
       const normalized = serviceType.toLowerCase();
-      return normalized.includes(searchValue) || selectedServices.has(normalized);
+      return normalized.includes(search) || selectedSet.has(normalized);
     })
     .sort((a, b) => a.localeCompare(b));
+}
 
-  recordServiceChecklist.innerHTML = commonServices
-    .map(
-      (serviceType) => `
+function buildServiceChecklistMarkup({ services, selectedNames, inputName }) {
+  const selectedSet = new Set(selectedNames.map((name) => name.toLowerCase()));
+
+  return services.length
+    ? services
+        .map((serviceType) => {
+          const serviceDefinition = getServiceDefinition(serviceType);
+          const category = serviceDefinition?.category || getServiceCategory(serviceType);
+          return `
         <label class="check-card">
           <input
             type="checkbox"
-            name="recordServiceType"
+            name="${inputName}"
             value="${serviceType}"
-            ${selectedServices.has(serviceType.toLowerCase()) ? "checked" : ""}
+            ${selectedSet.has(serviceType.toLowerCase()) ? "checked" : ""}
           />
-          <span>${serviceType}</span>
+          <span>
+            ${serviceType}
+            <span class="meta">${category}</span>
+          </span>
         </label>
-      `
-    )
-    .join("");
+      `;
+        })
+        .join("")
+    : `<p class="muted">No services match the current search.</p>`;
+}
+
+function handleSchedulePlanServiceChecklistChange(event) {
+  if (event.target.name !== "schedulePlanServiceType") {
+    return;
+  }
+
+  if (event.target.checked) {
+    schedulePlanServiceChecklist.querySelectorAll('input[name="schedulePlanServiceType"]').forEach((input) => {
+      if (input !== event.target) {
+        input.checked = false;
+      }
+    });
+    setSchedulePlanSelectedService(getServiceDefinition(event.target.value));
+    return;
+  }
+
+  clearSchedulePlanServiceSelection();
+  renderSchedulePlanServiceChecklist();
+}
+
+function handleSchedulePlanAddCustomService() {
+  const serviceType = cleanText(schedulePlanCustomServiceInput?.value);
+  if (!serviceType) {
+    return;
+  }
+
+  createCustomServiceDefinition({
+    name: serviceType,
+    category: cleanText(schedulePlanForm.elements.category.value) || "Custom",
+    notes: "",
+  });
+  renderServiceTypeOptions();
+  renderRecordServiceChecklist();
+  setSchedulePlanSelectedService(getServiceDefinition(serviceType));
+}
+
+function setSchedulePlanSelectedService(serviceDefinition) {
+  if (!serviceDefinition || !schedulePlanForm) {
+    return;
+  }
+
+  const matchingTemplate = getRecurringTemplateByName(serviceDefinition.name);
+  schedulePlanForm.elements.serviceId.value = serviceDefinition.id;
+  schedulePlanForm.elements.serviceName.value = serviceDefinition.name;
+  schedulePlanForm.elements.category.value = serviceDefinition.category || "Custom";
+  schedulePlanForm.elements.isCustom.value = String(!matchingTemplate || serviceDefinition.isCustom);
+  schedulePlanForm.elements.serviceKey.value = matchingTemplate?.key ?? serviceDefinition.id;
+  if (schedulePlanCustomServiceInput) {
+    schedulePlanCustomServiceInput.value = "";
+  }
+  renderSchedulePlanServiceChecklist();
+}
+
+function clearSchedulePlanServiceSelection() {
+  if (!schedulePlanForm) {
+    return;
+  }
+
+  schedulePlanForm.elements.serviceId.value = "";
+  schedulePlanForm.elements.serviceName.value = "";
+  schedulePlanForm.elements.serviceKey.value = "";
+  schedulePlanForm.elements.isCustom.value = "true";
+  if (schedulePlanCustomServiceInput) {
+    schedulePlanCustomServiceInput.value = "";
+  }
+  if (schedulePlanServiceSearchInput) {
+    schedulePlanServiceSearchInput.value = "";
+  }
 }
 
 function getSelectedRecordServiceTypes() {
   const checklistServices = recordServiceChecklist
     ? [...recordServiceChecklist.querySelectorAll('input[name="recordServiceType"]:checked')].map((input) => cleanText(input.value))
     : [];
-  const customService = cleanText(recordCustomServiceInput?.value);
-  return mergeUniqueText(checklistServices, customService ? [customService] : []).map((serviceType) => getCanonicalServiceType(serviceType));
+  const customServices = cleanText(recordCustomServiceInput?.value)
+    .split(",")
+    .map((serviceType) => cleanText(serviceType))
+    .filter(Boolean)
+    .map((serviceType) => getCanonicalServiceType(serviceType));
+  return mergeUniqueText(checklistServices, customServices);
+}
+
+function resolveServiceRecordCost(index, serviceCount, formCost) {
+  return index === 0 ? formCost : null;
 }
 
 function renderServiceNameManager() {
@@ -2538,6 +2583,23 @@ function getServiceDefinition(serviceName) {
         .some((value) => normalizeServiceLookupKey(value) === normalizedName)
     ) ?? null
   );
+}
+
+function getServiceDefinitionById(serviceId) {
+  const normalizedId = cleanText(serviceId);
+  if (!normalizedId) {
+    return null;
+  }
+
+  return getAllServiceDefinitions().find((serviceDefinition) => serviceDefinition.id === normalizedId) ?? null;
+}
+
+function resolvePlanServiceDefinition(plan) {
+  if (!plan) {
+    return null;
+  }
+
+  return getServiceDefinitionById(plan.serviceId) ?? getServiceDefinition(plan.serviceName);
 }
 
 function getServiceDefinitionKey(serviceDefinition) {
@@ -2892,7 +2954,7 @@ function buildDashboardCostMetrics(vehicle, records) {
 }
 
 function buildDashboardRecentUpdates(vehicle, records) {
-  const tireUpdates = TIRE_POSITIONS.map((position) => vehicle.tires?.[position.key])
+  const tireUpdates = TIRE_POSITIONS.map((position) => getActiveTireForPosition(vehicle, position.key))
     .filter(Boolean)
     .map((tire) => ({
       dateValue: new Date(tire.updatedAt || tire.installDate || 0).getTime(),
@@ -2922,7 +2984,7 @@ function buildDashboardMaintenanceTimeline(records) {
 
 function buildDashboardMiniTireStatusMarkup(vehicle, records) {
   const tireMap = Object.fromEntries(
-    TIRE_POSITIONS.map((position) => [position.key, vehicle.tires?.[position.key] ?? null])
+    TIRE_POSITIONS.map((position) => [position.key, getActiveTireForPosition(vehicle, position.key)])
   );
   const latestRotationRecord = [...records]
     .filter((record) => getServiceMatchKeys(record.serviceType).includes("tire rotation"))
@@ -2942,14 +3004,22 @@ function buildDashboardMiniTireStatusMarkup(vehicle, records) {
     <div class="timeline-item">
       <strong>Tires</strong>
       <div class="schedule-meta-grid">
-        <span class="meta">FL ${formatTireDepthLabel(tireMap.frontLeft)}</span>
-        <span class="meta">FR ${formatTireDepthLabel(tireMap.frontRight)}</span>
-        <span class="meta">RL ${formatTireDepthLabel(tireMap.rearLeft)}</span>
-        <span class="meta">RR ${formatTireDepthLabel(tireMap.rearRight)}</span>
+        <span class="meta">FL ${formatTireDepthLabel(tireMap.frontLeft, vehicle.currentMileage)}</span>
+        <span class="meta">FR ${formatTireDepthLabel(tireMap.frontRight, vehicle.currentMileage)}</span>
+        <span class="meta">RL ${formatTireDepthLabel(tireMap.rearLeft, vehicle.currentMileage)}</span>
+        <span class="meta">RR ${formatTireDepthLabel(tireMap.rearRight, vehicle.currentMileage)}</span>
       </div>
       <span class="meta">${nextRotationLine}</span>
     </div>
   `;
+}
+
+function roundTreadRating(value) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return null;
+  }
+
+  return Math.round(value * 10) / 10;
 }
 
 function normalizeTreadRating(value) {
@@ -2978,27 +3048,85 @@ function parseTreadRatingInput(value) {
   return normalizeTreadRating(numericOrNull(value));
 }
 
-function getTireTreadRating(tire) {
+function getStartingTreadRating(tire) {
   if (!tire) {
     return null;
   }
 
-  const current =
-    typeof tire.currentTreadDepth === "number"
-      ? tire.currentTreadDepth
+  return normalizeTreadRating(
+    typeof tire.startingTreadDepth === "number"
+      ? tire.startingTreadDepth
       : typeof tire.treadDepth === "number"
         ? tire.treadDepth
-        : tire.treadHistory?.[0]?.depth ?? null;
-  return normalizeTreadRating(current);
+        : tire.treadHistory?.[tire.treadHistory.length - 1]?.depth ?? null
+  );
 }
 
-function formatTireTreadLabel(tire) {
-  const rating = getTireTreadRating(tire);
-  return typeof rating === "number" ? `Tread: ${rating}/10` : "Tread: --";
+function calculateCurrentTreadRating(tire, currentVehicleMileage) {
+  const startingTread = getStartingTreadRating(tire);
+  if (typeof startingTread !== "number") {
+    return null;
+  }
+
+  if (typeof tire.installMileage !== "number" || typeof currentVehicleMileage !== "number") {
+    return startingTread;
+  }
+
+  const expectedLifeMiles = tire.warrantyMiles;
+  if (typeof expectedLifeMiles !== "number" || expectedLifeMiles <= 0) {
+    return startingTread;
+  }
+
+  const milesUsed = Math.max(currentVehicleMileage - tire.installMileage, 0);
+  const treadWear = milesUsed / expectedLifeMiles;
+  const currentTread = startingTread - treadWear * 9;
+  return Math.max(TREAD_RATING_MIN, Math.min(startingTread, roundTreadRating(currentTread)));
 }
 
-function formatTireDepthLabel(tire) {
-  return formatTireTreadLabel(tire);
+function syncTireTreadRatings(vehicle) {
+  if (!vehicle?.tires || typeof vehicle.currentMileage !== "number") {
+    return;
+  }
+
+  TIRE_POSITIONS.forEach(({ key }) => {
+    const tire = vehicle.tires[key];
+    if (!tire) {
+      return;
+    }
+
+    const currentTread = calculateCurrentTreadRating(tire, vehicle.currentMileage);
+    if (typeof currentTread !== "number") {
+      return;
+    }
+
+    tire.currentTreadDepth = currentTread;
+    tire.treadDepth = currentTread;
+  });
+}
+
+function getTireTreadRating(tire, vehicleMileage = null) {
+  if (!tire) {
+    return null;
+  }
+
+  if (typeof vehicleMileage === "number") {
+    return calculateCurrentTreadRating(tire, vehicleMileage);
+  }
+
+  if (typeof tire.currentTreadDepth === "number") {
+    return roundTreadRating(tire.currentTreadDepth);
+  }
+
+  return getStartingTreadRating(tire);
+}
+
+function formatTireTreadLabel(tire, vehicleMileage = null) {
+  const rating = getTireTreadRating(tire, vehicleMileage);
+  return typeof rating === "number" ? formatTreadRatingValue(rating) : "Tread: --";
+}
+
+function formatTireDepthLabel(tire, vehicleMileage = null) {
+  return formatTireTreadLabel(tire, vehicleMileage);
 }
 
 function getTreadRatingBadgeMeta(rating) {
@@ -3008,20 +3136,98 @@ function getTreadRatingBadgeMeta(rating) {
   if (rating >= 8) {
     return { status: "ok", label: "Good" };
   }
-  if (rating >= 4) {
+  if (rating >= 5) {
     return { status: "upcoming", label: "Monitor" };
   }
-  return { status: "due", label: "Replace soon" };
+  if (rating >= 3) {
+    return { status: "due", label: "Replace soon" };
+  }
+  return { status: "due", label: "Replace now" };
+}
+
+function formatTreadRatingDisplay(value, { starting = false } = {}) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return "Not saved";
+  }
+
+  if (starting) {
+    const whole = normalizeTreadRating(value);
+    return typeof whole === "number" ? `Tread: ${whole}/10` : "Not saved";
+  }
+
+  const rounded = roundTreadRating(value);
+  if (typeof rounded !== "number") {
+    return "Not saved";
+  }
+
+  const display = Number.isInteger(rounded) ? String(Math.round(rounded)) : rounded.toFixed(1);
+  return `Tread: ${display}/10`;
 }
 
 function formatTreadRatingValue(value) {
-  const rating = normalizeTreadRating(value);
-  return typeof rating === "number" ? `Tread: ${rating}/10` : "Not saved";
+  return formatTreadRatingDisplay(value);
 }
 
-function getTireDisplayName(tire) {
-  const label = [tire?.brand, tire?.model].filter(Boolean).join(" ").trim();
-  return label || `Tire ${(tire?.tireId || tire?.id || "").slice(0, 8) || "unknown"}`;
+function formatStartingTreadRatingValue(value) {
+  return formatTreadRatingDisplay(value, { starting: true });
+}
+
+function getActiveTireIdKey(positionKey) {
+  return `${positionKey}ActiveTireId`;
+}
+
+function getActiveTireForPosition(vehicle, positionKey) {
+  const tire = vehicle?.tires?.[positionKey] ?? null;
+  if (!tire) {
+    return null;
+  }
+
+  const activeTireId = vehicle?.[getActiveTireIdKey(positionKey)] ?? null;
+  const tireId = tire.tireId ?? tire.id ?? null;
+  if (activeTireId && tireId && activeTireId !== tireId) {
+    return null;
+  }
+
+  return normalizeTireRecord(tire, vehicle.id, positionKey);
+}
+
+function setActiveTireForPosition(vehicle, positionKey, tire) {
+  if (!vehicle.tires) {
+    vehicle.tires = {};
+  }
+
+  if (!tire) {
+    delete vehicle.tires[positionKey];
+    vehicle[getActiveTireIdKey(positionKey)] = null;
+    return;
+  }
+
+  const normalizedTire = normalizeTireRecord(tire, vehicle.id, positionKey);
+  vehicle.tires[positionKey] = normalizedTire;
+  vehicle[getActiveTireIdKey(positionKey)] = normalizedTire.tireId ?? normalizedTire.id ?? null;
+}
+
+function formatTireMileageLabel(vehicle, tire) {
+  if (typeof tire?.installMileage !== "number") {
+    return "Mileage not saved";
+  }
+
+  const milesOnTire = Math.max(vehicle.currentMileage - tire.installMileage, 0);
+  return milesOnTire === 0 ? "New" : `${formatNumber(milesOnTire)} mi`;
+}
+
+function getTireDisplayName(tire, positionKey) {
+  const label = [cleanText(tire?.brand), cleanText(tire?.model)].filter(Boolean).join(" ").trim();
+  if (label && positionKey) {
+    return `${label} — ${getTirePositionLabel(positionKey)}`;
+  }
+  if (label) {
+    return label;
+  }
+  if (positionKey) {
+    return `${getTirePositionLabel(positionKey)} tire`;
+  }
+  return "Tire";
 }
 
 function getTirePositionLabel(positionKey) {
@@ -3230,18 +3436,13 @@ function renderVehicles() {
       .filter(Boolean)
       .sort(sortRecurringPlanSummaries);
     const nextDue = [...recordSummaries, ...recurringSummaries].filter(Boolean).sort(sortByUrgency)[0] ?? null;
-    const tires = TIRE_POSITIONS.map((position) => vehicle.tires?.[position.key] ?? null);
+    const tires = TIRE_POSITIONS.map((position) => getActiveTireForPosition(vehicle, position.key));
     const trackedTireCount = tires.filter(Boolean).length;
     const costMetrics = buildDashboardCostMetrics(vehicle, records);
     const lifetimeStats = buildGarageLifetimeStats(vehicle, records, tires, costMetrics);
     const garageDocuments = buildGarageDocuments(records);
     const tirePosition = TIRE_POSITIONS.find((position) => position.key === activeGarageTirePosition) ?? TIRE_POSITIONS[0];
-    const selectedTire = vehicle.tires?.[tirePosition.key]
-      ? normalizeTireRecord(vehicle.tires[tirePosition.key], vehicle.id, tirePosition.key)
-      : null;
-    const tireRotationHistory = records
-      .filter((record) => getServiceMatchKeys(record.serviceType).includes("tire rotation"))
-      .slice(0, 5);
+    const selectedTire = getActiveTireForPosition(vehicle, tirePosition.key);
 
     vehicleList.innerHTML = `
     <article class="vehicle-card garage-vehicle-card">
@@ -3299,10 +3500,10 @@ function renderVehicles() {
             isTireTrackerExpanded
               ? `
                 <div class="tire-grid garage-tire-grid">
-                  ${tireCardMarkup(vehicle, vehicle.tires?.frontLeft, TIRE_POSITIONS[0])}
-                  ${tireCardMarkup(vehicle, vehicle.tires?.frontRight, TIRE_POSITIONS[1])}
-                  ${tireCardMarkup(vehicle, vehicle.tires?.rearLeft, TIRE_POSITIONS[2])}
-                  ${tireCardMarkup(vehicle, vehicle.tires?.rearRight, TIRE_POSITIONS[3])}
+                  ${tireCardMarkup(vehicle, getActiveTireForPosition(vehicle, TIRE_POSITIONS[0].key), TIRE_POSITIONS[0])}
+                  ${tireCardMarkup(vehicle, getActiveTireForPosition(vehicle, TIRE_POSITIONS[1].key), TIRE_POSITIONS[1])}
+                  ${tireCardMarkup(vehicle, getActiveTireForPosition(vehicle, TIRE_POSITIONS[2].key), TIRE_POSITIONS[2])}
+                  ${tireCardMarkup(vehicle, getActiveTireForPosition(vehicle, TIRE_POSITIONS[3].key), TIRE_POSITIONS[3])}
                 </div>
                 <div class="timeline-item tire-history-panel">
                   <div class="vehicle-summary">
@@ -3316,11 +3517,10 @@ function renderVehicles() {
                       </button>
                     </div>
                   </div>
-                  <span class="meta">Tire ID: ${selectedTire?.tireId || "Not saved"}</span>
                   <span class="meta">Position history: ${buildTirePositionHistoryLabel(selectedTire)}</span>
-                  <span class="meta">Tread history: ${buildTireTreadHistoryLabel(selectedTire)}</span>
-                  <span class="meta">Rotation history: ${buildTireRotationHistoryLabel(selectedTire, tireRotationHistory)}</span>
-                  <span class="meta">Replacement history: ${buildTireReplacementHistoryLabel(vehicle, selectedTire)}</span>
+                  <span class="meta">Tread history: ${buildTireTreadHistoryLabel(selectedTire, vehicle.currentMileage)}</span>
+                  <span class="meta">Rotation history: ${buildTireRotationHistoryLabel(selectedTire)}</span>
+                  <span class="meta">Replacement history: ${buildTireReplacementHistoryLabel(selectedTire, tirePosition.key)}</span>
                 </div>
               `
               : ""
@@ -3397,38 +3597,7 @@ function renderVehicles() {
               records.length
                 ? records
                     .slice(0, 4)
-                    .map(
-                      (record) => `
-                        <div class="timeline-item">
-                          <div class="vehicle-summary">
-                            <strong>${record.serviceType}</strong>
-                            <div class="inline-row">
-                              <button class="button-secondary" type="button" data-edit-record="${record.id}">
-                                Edit
-                              </button>
-                              <button class="button-ghost" type="button" data-delete-record="${record.id}">
-                                Delete
-                              </button>
-                            </div>
-                          </div>
-                          <span class="meta">${formatDate(record.serviceDate)} at ${formatNumber(record.mileageAtService)} miles</span>
-                          <span class="meta">${record.shop ? `Shop: ${record.shop}` : "No shop saved"}</span>
-                          <div class="reminder-editor">
-                            <label>
-                              Repeat miles
-                              <input type="number" min="0" step="1" value="${record.repeatMiles ?? ""}" data-reminder-miles="${record.id}" />
-                            </label>
-                            <label>
-                              Repeat months
-                              <input type="number" min="0" step="1" value="${record.repeatMonths ?? ""}" data-reminder-months="${record.id}" />
-                            </label>
-                            <button class="button-secondary" type="button" data-save-reminder="${record.id}">
-                              Save reminder
-                            </button>
-                          </div>
-                        </div>
-                      `
-                    )
+                    .map((record) => buildGarageServiceRecordMarkup(record))
                     .join("")
                 : `<p class="muted">No service records yet.</p>`
             }
@@ -3446,6 +3615,31 @@ function renderVehicles() {
 function buildGarageDocuments(records) {
   const vehicle = state.vehicles.find((item) => item.id === getActiveAppVehicleId());
   return [...(vehicle?.documents || []), ...records.filter((record) => record.receiptData)].slice(0, 8);
+}
+
+function buildGarageServiceRecordMarkup(record) {
+  const category = record.category || getServiceCategory(record.serviceType);
+
+  return `
+    <div class="timeline-item">
+      <div class="vehicle-summary">
+        <strong>${record.serviceType}</strong>
+        <div class="inline-row">
+          <button class="button-secondary" type="button" data-edit-record="${record.id}">
+            Edit
+          </button>
+          <button class="button-ghost" type="button" data-delete-record="${record.id}">
+            Delete
+          </button>
+        </div>
+      </div>
+      <span class="meta">${formatHistoryVisitMeta(record)}</span>
+      ${record.shop ? `<span class="meta">Shop: ${record.shop}</span>` : ""}
+      ${typeof record.cost === "number" && Number.isFinite(record.cost) ? `<span class="meta">Cost: ${formatCurrency(record.cost)}</span>` : ""}
+      <span class="meta">Category: ${category}</span>
+      ${record.notes ? `<span class="meta">${record.notes}</span>` : ""}
+    </div>
+  `;
 }
 
 function buildGarageLifetimeStats(vehicle, records, tires, costMetrics) {
@@ -3494,10 +3688,8 @@ function getTireHealthMeta(tire, vehicle) {
     };
   }
 
-  const currentDepth = getTireTreadRating(tire);
-  const startingDepth = normalizeTreadRating(
-    typeof tire.startingTreadDepth === "number" ? tire.startingTreadDepth : currentDepth
-  );
+  const currentDepth = getTireTreadRating(tire, vehicle.currentMileage);
+  const startingDepth = getStartingTreadRating(tire);
   const milesDriven = Math.max(vehicle.currentMileage - (tire.installMileage ?? vehicle.currentMileage), 0);
   const totalWear =
     typeof startingDepth === "number" && typeof currentDepth === "number" ? Math.max(startingDepth - currentDepth, 0) : 0;
@@ -3678,6 +3870,10 @@ function applyTirePositionMapping(vehicle, mapping, { rotationType, notes, milea
   });
 
   vehicle.tires = nextTires;
+  TIRE_POSITIONS.forEach((position) => {
+    const tire = nextTires[position.key] ?? null;
+    vehicle[getActiveTireIdKey(position.key)] = tire?.tireId ?? tire?.id ?? null;
+  });
 }
 
 function applyTireRotation(vehicle, { rotationType, notes, mileage, date }) {
@@ -3750,6 +3946,7 @@ function archiveReplacedTire(vehicle, position, tire, replacement) {
         shop: replacement.shop,
         cost: replacement.cost,
         notes: replacement.notes,
+        sourceLogId: replacement.sourceLogId ?? null,
       },
     ],
   };
@@ -3759,20 +3956,35 @@ function archiveReplacedTire(vehicle, position, tire, replacement) {
     currentPosition.toMileage = replacement.mileage;
   }
   vehicle.archivedTires.unshift(archived);
+  return archived;
 }
 
 function createReplacementTireRecord(payload) {
   const nextId = crypto.randomUUID();
   const installDate = payload.installDate || new Date().toISOString().slice(0, 10);
   const installMileage = typeof payload.installMileage === "number" ? payload.installMileage : null;
+  const treadDepth = normalizeTreadRating(payload.currentTreadDepth ?? payload.treadDepth);
   const nextTire = normalizeTireRecord(
     {
-      ...payload,
       id: nextId,
       tireId: nextId,
+      vehicleId: payload.vehicleId,
+      position: payload.position,
+      currentPosition: payload.position,
+      brand: cleanText(payload.brand),
+      model: cleanText(payload.model),
+      type: cleanText(payload.type),
+      size: cleanText(payload.size),
+      warrantyMiles: payload.warrantyMiles ?? null,
+      estimatedReplacementMileage: payload.estimatedReplacementMileage ?? null,
+      recommendedPressure: payload.recommendedPressure ?? null,
+      installDate,
+      installMileage,
+      installer: cleanText(payload.installer),
+      notes: cleanText(payload.notes),
+      sourceLogId: payload.sourceLogId ?? payload.sourceServiceId ?? null,
       status: "active",
-      startingTreadDepth: payload.currentTreadDepth,
-      currentTreadDepth: payload.currentTreadDepth,
+      startingTreadDepth: treadDepth,
       treadHistory: [],
       positionHistory: [
         {
@@ -3785,13 +3997,14 @@ function createReplacementTireRecord(payload) {
       ],
       rotationHistory: [],
       replacementHistory: [],
+      updatedAt: new Date().toISOString(),
     },
     payload.vehicleId,
     payload.position
   );
-  if (typeof payload.currentTreadDepth === "number") {
+  if (typeof treadDepth === "number") {
     logTreadDepthEntry(nextTire, {
-      depth: payload.currentTreadDepth,
+      depth: treadDepth,
       mileage: installMileage ?? 0,
       date: installDate,
       notes: "Installed replacement tire",
@@ -3810,15 +4023,17 @@ function garageTireNodeMarkup(vehicle, tire, position, activePosition) {
   return `
     <button class="garage-tire-node ${activePosition === position.key ? "is-active" : ""}" type="button" data-select-tire="${position.key}">
       <span>${shortLabelMap[position.key] || position.label}</span>
-      <strong>${formatTireTreadLabel(tire)}</strong>
+      <strong>${formatTireTreadLabel(tire, vehicle.currentMileage)}</strong>
     </button>
   `;
 }
 
-function buildTireTreadHistoryLabel(tire) {
-  const currentRating = getTireTreadRating(tire);
+function buildTireTreadHistoryLabel(tire, vehicleMileage = null) {
+  const currentRating = getTireTreadRating(tire, vehicleMileage);
   if (!tire?.treadHistory?.length) {
-    return typeof currentRating === "number" ? `${formatTreadRatingValue(currentRating)} current reading` : "No tread history yet";
+    return typeof currentRating === "number"
+      ? `${formatTreadRatingValue(currentRating)} current reading`
+      : "No tread history yet";
   }
 
   return tire.treadHistory
@@ -3924,31 +4139,44 @@ function buildTirePositionHistoryLabel(tire) {
     .join(" • ");
 }
 
-function buildTireRotationHistoryLabel(tire, fallbackRotationHistory) {
-  const history = tire?.rotationHistory?.length ? tire.rotationHistory : fallbackRotationHistory;
-  if (!history?.length) {
+function buildTireRotationHistoryLabel(tire) {
+  if (!tire?.rotationHistory?.length) {
     return "No rotations logged yet";
   }
 
-  return history
+  return tire.rotationHistory
     .slice(0, 3)
     .map((entry) => `${safeFormatDate(entry.date)} (${entry.rotationType || "rotation"})`)
     .join(" • ");
 }
 
-function buildTireReplacementHistoryLabel(vehicle, tire) {
-  const archivedMatches = (vehicle.archivedTires || []).filter(
-    (archivedTire) => archivedTire.tireId === tire?.tireId || archivedTire.replacementHistory?.some((entry) => entry.newTireId === tire?.tireId)
-  );
-  if (!archivedMatches.length) {
-    return tire ? "Recently replaced" : "No replacement history yet";
+function buildTireReplacementHistoryLabel(tire, positionKey) {
+  const lines = [];
+
+  if (tire?.installDate) {
+    const mileagePart =
+      typeof tire.installMileage === "number" ? ` at ${formatNumber(tire.installMileage)} mi` : "";
+    lines.push(`Replaced on ${safeFormatDate(tire.installDate)}${mileagePart}`);
+    lines.push(`Installed at ${getTirePositionLabel(positionKey)}`);
   }
 
-  return archivedMatches
-    .flatMap((archivedTire) => archivedTire.replacementHistory || [])
-    .slice(-3)
-    .map((entry) => `${safeFormatDate(entry.date)} • ${entry.replacementReason || "Replacement logged"}`)
-    .join(" • ");
+  if (Array.isArray(tire?.replacementHistory) && tire.replacementHistory.length) {
+    tire.replacementHistory.forEach((entry) => {
+      if (entry.replacementReason?.startsWith("Replaced on")) {
+        return;
+      }
+      const mileagePart = typeof entry.mileage === "number" ? ` at ${formatNumber(entry.mileage)} mi` : "";
+      lines.push(
+        `${entry.replacementReason || "Replacement logged"}${entry.date ? ` (${safeFormatDate(entry.date)}${mileagePart})` : ""}`
+      );
+    });
+  }
+
+  if (!lines.length) {
+    return tire ? `${getTireDisplayName(tire, positionKey)} installed` : "No replacement history yet";
+  }
+
+  return [...new Set(lines)].slice(0, 4).join(" • ");
 }
 
 function safeFormatDate(value) {
@@ -3962,20 +4190,6 @@ function safeFormatDate(value) {
 
 function renderHistory() {
   const records = getFilteredHistoryRecords();
-  const topRecord = records[0] ?? null;
-
-  if (historyTopActionTarget) {
-    historyTopActionTarget.textContent = topRecord
-      ? `${topRecord.serviceType} • ${formatDate(topRecord.serviceDate)} • ${formatNumber(topRecord.mileageAtService)} miles`
-      : "No matching services yet.";
-  }
-  if (historyTopEditButton) {
-    historyTopEditButton.disabled = !topRecord;
-  }
-  if (historyTopDeleteButton) {
-    historyTopDeleteButton.disabled = !topRecord;
-  }
-
   const visitGroups = buildHistoryVisitGroups(records);
 
   historyList.innerHTML = visitGroups.length
@@ -4011,45 +4225,6 @@ function getFilteredHistoryRecords() {
         .includes(query);
     })
     .sort((a, b) => sortHistoryRecords(a, b, sortOption));
-}
-
-function handleHistoryTopAdd() {
-  resetRecordFormMode();
-  setRecordFormExpanded(true);
-  setActiveScreen("history");
-  recordForm.scrollIntoView({ behavior: "smooth", block: "start" });
-}
-
-function handleHistoryTopEdit() {
-  const topRecord = getFilteredHistoryRecords()[0];
-  if (!topRecord) {
-    return;
-  }
-  loadRecordIntoForm(topRecord);
-}
-
-function handleHistoryTopDelete() {
-  const topRecord = getFilteredHistoryRecords()[0];
-  if (!topRecord) {
-    return;
-  }
-
-  const confirmed = window.confirm(
-    `Delete ${topRecord.serviceType} from ${formatDate(topRecord.serviceDate)} at ${formatNumber(
-      topRecord.mileageAtService
-    )} miles?`
-  );
-
-  if (!confirmed) {
-    return;
-  }
-
-  state.records = state.records.filter((record) => record.id !== topRecord.id);
-  if (editingVisitRecordIds.includes(topRecord.id)) {
-    resetRecordFormMode();
-  }
-  persist();
-  renderHistory();
 }
 
 function syncHistoryToActiveVehicle() {
@@ -4089,14 +4264,17 @@ function repairOrphanedVehicleLinks() {
 }
 
 function sortHistoryRecords(a, b, sortOption) {
+  const mileageA = typeof a.mileageAtService === "number" ? a.mileageAtService : -1;
+  const mileageB = typeof b.mileageAtService === "number" ? b.mileageAtService : -1;
+
   if (sortOption === "oldest") {
-    return new Date(a.serviceDate) - new Date(b.serviceDate) || a.mileageAtService - b.mileageAtService;
+    return new Date(a.serviceDate) - new Date(b.serviceDate) || mileageA - mileageB;
   }
   if (sortOption === "mileage-high") {
-    return b.mileageAtService - a.mileageAtService || new Date(b.serviceDate) - new Date(a.serviceDate);
+    return mileageB - mileageA || new Date(b.serviceDate) - new Date(a.serviceDate);
   }
   if (sortOption === "mileage-low") {
-    return a.mileageAtService - b.mileageAtService || new Date(b.serviceDate) - new Date(a.serviceDate);
+    return mileageA - mileageB || new Date(b.serviceDate) - new Date(a.serviceDate);
   }
   if (sortOption === "cost-high") {
     return (b.cost || 0) - (a.cost || 0) || new Date(b.serviceDate) - new Date(a.serviceDate);
@@ -4104,7 +4282,7 @@ function sortHistoryRecords(a, b, sortOption) {
   if (sortOption === "cost-low") {
     return (a.cost || 0) - (b.cost || 0) || new Date(b.serviceDate) - new Date(a.serviceDate);
   }
-  return new Date(b.serviceDate) - new Date(a.serviceDate) || b.mileageAtService - a.mileageAtService;
+  return new Date(b.serviceDate) - new Date(a.serviceDate) || mileageB - mileageA;
 }
 
 function buildHistoryTireDetailsMarkup(record) {
@@ -4153,10 +4331,18 @@ function buildHistoryVisitGroups(records) {
   return [...groupedVisits.values()];
 }
 
+function formatHistoryVisitMeta(record) {
+  const dateLabel = formatDate(record.serviceDate);
+  if (typeof record.mileageAtService === "number" && Number.isFinite(record.mileageAtService)) {
+    return `${dateLabel} • ${formatNumber(record.mileageAtService)} miles`;
+  }
+  return dateLabel;
+}
+
 function buildHistoryVisitMarkup(records) {
   const leadRecord = records[0];
   const isMultiServiceVisit = records.length > 1;
-  const totalCost = records.reduce((sum, record) => sum + (record.cost || 0), 0);
+  const totalCost = roundCurrency(records.reduce((sum, record) => sum + (record.cost || 0), 0));
   const summary = buildServiceSummary(leadRecord);
   const visitKey = buildHistoryVisitKey(leadRecord);
 
@@ -4165,7 +4351,7 @@ function buildHistoryVisitMarkup(records) {
       <div class="vehicle-summary">
         <div>
           <strong>${isMultiServiceVisit ? `${records.length} services logged` : leadRecord.serviceType}</strong>
-          <span class="meta">${formatDate(leadRecord.serviceDate)} • ${formatNumber(leadRecord.mileageAtService)} miles</span>
+          <span class="meta">${formatHistoryVisitMeta(leadRecord)}</span>
           <span class="meta">${leadRecord.shop ? `Shop / mechanic: ${leadRecord.shop}` : "Shop / mechanic not saved"}</span>
         </div>
         <div class="inline-row">
@@ -4187,6 +4373,7 @@ function buildHistoryVisitMarkup(records) {
           ? `<span class="meta">Services: ${records.map((record) => record.serviceType).join(", ")}</span>`
           : `<span class="meta">Category: ${leadRecord.category || getServiceCategory(leadRecord.serviceType)}</span>`
       }
+      ${buildLinkedPlanMarkup(leadRecord)}
       <details class="history-card-details">
         <summary>${isMultiServiceVisit ? "View visit details" : "View details"}</summary>
         <div class="list-stack">
@@ -4218,14 +4405,13 @@ function buildHistoryRecordDetailsMarkup(record) {
         </div>
       </div>
       <span class="meta">${record.cost ? `Cost: ${formatCurrency(record.cost)}` : "Cost not saved"}</span>
+      ${buildLinkedPlanMarkup(record)}
       <span class="meta">${record.notes || "No notes saved"}</span>
       ${
         record.receiptData
           ? `<a class="button-secondary receipt-link" href="${record.receiptData}" download="${record.receiptName || "receipt"}">View receipt image</a>`
           : `<span class="meta">No receipt uploaded</span>`
       }
-      <span class="meta">Repeat every X miles: ${record.repeatMiles ? formatNumber(record.repeatMiles) : "Not set"}</span>
-      <span class="meta">Repeat every X months: ${record.repeatMonths ?? "Not set"}</span>
       ${tireDetailsMarkup}
     </div>
   `;
@@ -4273,7 +4459,7 @@ function renderHistoryTimeline(visitGroups) {
                           </button>
                         </div>
                       </div>
-                      <span class="meta">${formatDate(leadRecord.serviceDate)} • ${formatNumber(leadRecord.mileageAtService)} miles</span>
+                      <span class="meta">${formatHistoryVisitMeta(leadRecord)}</span>
                       <span class="meta">${
                         vehicle ? `${vehicle.year} ${vehicle.make} ${vehicle.model}` : "Vehicle removed"
                       }</span>
@@ -4308,11 +4494,10 @@ function loadVisitIntoNewForm(record) {
   resetRecordFormMode();
   recordForm.elements.vehicleId.value = record.vehicleId;
   recordForm.elements.serviceDate.value = record.serviceDate;
-  recordForm.elements.serviceMileage.value = record.mileageAtService;
+  recordForm.elements.serviceMileage.value =
+    typeof record.mileageAtService === "number" ? record.mileageAtService : "";
   recordForm.elements.shop.value = record.shop ?? "";
-  if (record.cost) {
-    recordForm.elements.cost.value = record.cost;
-  }
+  recordForm.elements.cost.value = "";
   setActiveScreen("history");
   setRecordFormExpanded(true);
   recordForm.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -4328,16 +4513,17 @@ function loadVisitIntoForm(records) {
 
   editingVisitRecordIds = visitRecords.map((record) => record.id);
   recordForm.reset();
+  syncRecordFormLinkedPlan(leadRecord);
   recordForm.elements.vehicleId.value = leadRecord.vehicleId;
   recordForm.elements.serviceDate.value = leadRecord.serviceDate;
-  recordForm.elements.serviceMileage.value = leadRecord.mileageAtService;
-  recordForm.elements.cost.value = leadRecord.cost ?? "";
+  recordForm.elements.serviceMileage.value =
+    typeof leadRecord.mileageAtService === "number" ? leadRecord.mileageAtService : "";
+  const visitTotalCost = visitRecords.reduce((sum, record) => sum + (record.cost || 0), 0);
+  recordForm.elements.cost.value = visitTotalCost > 0 ? visitTotalCost : leadRecord.cost ?? "";
   recordForm.elements.shop.value = leadRecord.shop ?? "";
   recordForm.elements.notes.value = leadRecord.notes ?? "";
-  recordForm.elements.repeatMiles.value = leadRecord.repeatMiles ?? "";
-  recordForm.elements.repeatMonths.value = leadRecord.repeatMonths ?? "";
   recordForm.elements.serviceType.value = leadRecord.serviceType;
-  recordCustomServiceInput.value = visitRecords.map((record) => record.serviceType).join(", ");
+  recordCustomServiceInput.value = "";
   setRecordCategoryValue(getAutoCategoryForSelectedServices(visitRecords.map((record) => record.serviceType)));
 
   const leadTireDetails = visitRecords.find((record) => record.tireDetails)?.tireDetails;
@@ -4361,7 +4547,6 @@ function loadVisitIntoForm(records) {
   checkServiceTypes(visitRecords.map((record) => record.serviceType));
   syncRecordTireSection();
   syncRecordTirePositionMode();
-  renderHistoryQuickServiceChecklist();
   updateRecordFormMode();
   setActiveScreen("history");
   setRecordFormExpanded(true);
@@ -4397,7 +4582,6 @@ function handleScreenButtonClick(screenName) {
   if (!editingVisitRecordIds.length) {
     setRecordFormExpanded(false);
   }
-  setHistoryQuickAddExpanded(false);
   requestAnimationFrame(() => {
     historyLogSection?.scrollIntoView({ behavior: "smooth", block: "start" });
   });
@@ -4415,20 +4599,34 @@ function setActiveScreen(screenName) {
   persistUiState();
 }
 
+function syncRecordFormLinkedPlan(record) {
+  if (record?.linkedPlanId) {
+    recordForm.dataset.linkedPlanId = record.linkedPlanId;
+  } else {
+    delete recordForm.dataset.linkedPlanId;
+  }
+
+  if (record?.serviceId) {
+    recordForm.dataset.serviceId = record.serviceId;
+  } else {
+    delete recordForm.dataset.serviceId;
+  }
+}
+
 function loadRecordIntoForm(record) {
   editingVisitRecordIds = [record.id];
   recordForm.reset();
+  syncRecordFormLinkedPlan(record);
   recordForm.elements.vehicleId.value = record.vehicleId;
   recordForm.elements.serviceType.value = record.serviceType;
   recordCustomServiceInput.value = record.serviceType;
   setRecordCategoryValue(record.category || getServiceCategory(record.serviceType), { manual: true });
   recordForm.elements.serviceDate.value = record.serviceDate;
-  recordForm.elements.serviceMileage.value = record.mileageAtService;
+  recordForm.elements.serviceMileage.value =
+    typeof record.mileageAtService === "number" ? record.mileageAtService : "";
   recordForm.elements.cost.value = record.cost ?? "";
   recordForm.elements.shop.value = record.shop ?? "";
   recordForm.elements.notes.value = record.notes ?? "";
-  recordForm.elements.repeatMiles.value = record.repeatMiles ?? "";
-  recordForm.elements.repeatMonths.value = record.repeatMonths ?? "";
   if (record.tireDetails) {
     recordForm.elements.recordTireBrand.value = record.tireDetails.brand ?? "";
     recordForm.elements.recordTireModel.value = record.tireDetails.model ?? "";
@@ -4448,7 +4646,6 @@ function loadRecordIntoForm(record) {
   syncRecordTireSection();
   syncRecordTirePositionMode();
   renderRecordServiceChecklist();
-  renderHistoryQuickServiceChecklist();
   updateRecordFormMode();
   setActiveScreen("history");
   recordForm.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -4470,21 +4667,15 @@ function updateRecordFormMode() {
 function resetRecordFormMode() {
   editingVisitRecordIds = [];
   recordForm.reset();
+  delete recordForm.dataset.linkedPlanId;
+  delete recordForm.dataset.serviceId;
   hideRecordTireSection();
   syncRecordTirePositionMode();
   setRecordCategoryValue("Custom");
   recordCustomServiceInput.value = "";
   renderRecordServiceChecklist();
-  renderHistoryQuickServiceChecklist();
   updateRecordFormMode();
   setRecordFormExpanded(false);
-}
-
-function setHistoryQuickAddExpanded(expanded) {
-  isHistoryQuickAddExpanded = expanded;
-  historyQuickAddPanel.classList.toggle("is-hidden", !expanded);
-  historyQuickAddToggleButton.setAttribute("aria-expanded", String(expanded));
-  persistUiState();
 }
 
 function loadVehicleIntoForm(vehicle) {
@@ -4539,7 +4730,7 @@ function loadTireIntoForm(vehicleId, position) {
     return;
   }
 
-  const tire = vehicle.tires?.[position] ?? null;
+  const tire = getActiveTireForPosition(vehicle, position);
   editingTireKey = `${vehicleId}:${position}`;
   tireEditForm.reset();
   tireEditForm.elements.mode.value = "edit";
@@ -4557,7 +4748,7 @@ function loadTireIntoForm(vehicleId, position) {
     tireEditForm.elements.model.value = tire.model ?? "";
     tireEditForm.elements.type.value = tire.type ?? "";
     tireEditForm.elements.size.value = tire.size ?? "";
-    tireEditForm.elements.treadDepth.value = getTireTreadRating(tire) ?? "";
+    tireEditForm.elements.treadDepth.value = getStartingTreadRating(tire) ?? "";
     tireEditForm.elements.warrantyMiles.value =
       typeof tire.warrantyMiles === "number" ? tire.warrantyMiles : "";
     tireEditForm.elements.estimatedReplacementMileage.value =
@@ -4589,7 +4780,10 @@ function resetTireEditMode() {
 function setRecordFormExpanded(expanded) {
   isRecordFormExpanded = expanded;
   recordFormPanel.classList.toggle("is-hidden", !expanded);
-  recordFormToggleButton.setAttribute("aria-expanded", String(expanded));
+  if (recordFormToggleButton) {
+    recordFormToggleButton.classList.toggle("is-hidden", expanded);
+    recordFormToggleButton.setAttribute("aria-expanded", String(expanded));
+  }
   persistUiState();
 }
 
@@ -4601,9 +4795,13 @@ function buildServiceSummary(record) {
 
   const totalMilesInterval = typeof record.repeatMiles === "number" ? record.repeatMiles : null;
   const milesDrivenSinceService =
-    typeof totalMilesInterval === "number" ? Math.max(vehicle.currentMileage - record.mileageAtService, 0) : null;
+    typeof totalMilesInterval === "number" && typeof record.mileageAtService === "number"
+      ? Math.max(vehicle.currentMileage - record.mileageAtService, 0)
+      : null;
   const nextDueMileage =
-    typeof record.repeatMiles === "number" ? record.mileageAtService + record.repeatMiles : null;
+    typeof record.repeatMiles === "number" && typeof record.mileageAtService === "number"
+      ? record.mileageAtService + record.repeatMiles
+      : null;
   const nextDueDate =
     typeof record.repeatMonths === "number" ? addMonths(record.serviceDate, record.repeatMonths) : null;
   const dueByMileage = typeof nextDueMileage === "number" && vehicle.currentMileage >= nextDueMileage;
@@ -4686,9 +4884,15 @@ function tireCardMarkup(vehicle, tire, position) {
     `;
   }
 
-  const milesOnTire = Math.max(vehicle.currentMileage - (tire.installMileage ?? vehicle.currentMileage), 0);
+  const milesOnTire =
+    typeof tire.installMileage === "number"
+      ? Math.max(vehicle.currentMileage - tire.installMileage, 0)
+      : null;
+  const mileageLabel = formatTireMileageLabel(vehicle, tire);
   const warrantyRemaining =
-    typeof tire.warrantyMiles === "number" ? Math.max(tire.warrantyMiles - milesOnTire, 0) : null;
+    typeof tire.warrantyMiles === "number" && milesOnTire !== null
+      ? Math.max(tire.warrantyMiles - milesOnTire, 0)
+      : null;
   const replacementRemaining =
     typeof tire.estimatedReplacementMileage === "number"
       ? Math.max(tire.estimatedReplacementMileage - vehicle.currentMileage, 0)
@@ -4697,11 +4901,14 @@ function tireCardMarkup(vehicle, tire, position) {
     typeof tire.estimatedReplacementMileage === "number" && typeof tire.installMileage === "number"
       ? Math.max(tire.estimatedReplacementMileage - tire.installMileage, 0)
       : null;
-  const tireLifeProgress = buildProgressMeta(milesOnTire, totalEstimatedLife);
-  const tireName = [tire.brand, tire.model].filter(Boolean).join(" ") || "Brand/model not saved";
-  const treadRating = getTireTreadRating(tire);
+  const tireLifeProgress =
+    milesOnTire !== null ? buildProgressMeta(milesOnTire, totalEstimatedLife) : null;
+  const tireName = getTireDisplayName(tire, position.key);
+  const startingTread = getStartingTreadRating(tire);
+  const treadRating = getTireTreadRating(tire, vehicle.currentMileage);
   const treadBadge = getTreadRatingBadgeMeta(treadRating);
   const treadLabel = formatTreadRatingValue(treadRating);
+  const startingTreadLabel = formatStartingTreadRatingValue(startingTread);
   const summaryMeta = [
     tire.size || "Size not saved",
     typeof tire.recommendedPressure === "number" ? `${tire.recommendedPressure} PSI` : "PSI not saved",
@@ -4712,11 +4919,10 @@ function tireCardMarkup(vehicle, tire, position) {
     <details class="tire-dropdown tire-card">
       <summary class="tire-dropdown-summary">
         <span>
-          <strong>${position.label}</strong>
-          <span class="meta">${tireName}</span>
+          <strong>${tireName}</strong>
           <span class="meta">${summaryMeta}</span>
         </span>
-        <span class="tire-summary-mileage">${formatNumber(milesOnTire)} mi</span>
+        <span class="tire-summary-mileage">${mileageLabel}</span>
         ${typeof treadRating === "number" ? statusPill(treadBadge.status, treadBadge.label) : ""}
       </summary>
       <div class="tire-dropdown-content">
@@ -4725,10 +4931,13 @@ function tireCardMarkup(vehicle, tire, position) {
           ${typeof treadRating === "number" ? statusPill(treadBadge.status, treadBadge.label) : ""}
         </div>
         <span class="meta field-helper">Higher number = more tread left. Tread rating goes down as the tire wears.</span>
-        <span class="meta">Tire ID: ${tire.tireId || "Not saved"}</span>
         <span class="meta">Brand / model: ${tireName}</span>
         <span class="meta">Size: ${tire.size || "Not saved"}</span>
-        <span class="meta">Starting tread rating: ${formatTreadRatingValue(normalizeTreadRating(tire.startingTreadDepth ?? treadRating))}</span>
+        <span class="meta">Starting tread rating: ${startingTreadLabel}</span>
+        <span class="meta">Current tread rating: ${treadLabel}</span>
+        <span class="meta">Miles used: ${
+          milesOnTire !== null ? `${formatNumber(milesOnTire)} mi` : "Not saved"
+        }</span>
         <span class="meta">Install date: ${safeFormatDate(tire.installDate)}</span>
         <span class="meta">Install mileage: ${
           typeof tire.installMileage === "number" ? `${formatNumber(tire.installMileage)} miles` : "Not saved"
@@ -4766,7 +4975,7 @@ function tireCardMarkup(vehicle, tire, position) {
             ? `Recommended pressure: ${tire.recommendedPressure} PSI`
             : "Recommended pressure not saved"
         }</span>
-        <span class="meta">Miles driven on current tire: ${formatNumber(milesOnTire)}</span>
+        <span class="meta">Miles driven on current tire: ${mileageLabel}</span>
         <div class="tire-card-actions">
           <button class="button-secondary" type="button" data-open-tire-rotation>Rotate / Move Tires</button>
           <button class="button-secondary" type="button" data-replace-tire="${position.key}" data-vehicle-id="${vehicle.id}">
@@ -4842,10 +5051,12 @@ function serviceScheduleMarkup(item) {
   const timeProgress = buildProgressMeta(item.daysElapsed, item.totalDaysInterval);
 
   return `
-    <article class="timeline-item schedule-card">
+    <article class="timeline-item schedule-card schedule-card-interactive" data-plan-card="${item.planKey}">
       <div class="vehicle-summary">
         <div>
-          <strong>${item.serviceType}</strong>
+          <button class="schedule-service-link" type="button" data-log-recurring-plan="${item.planKey}">
+            <strong>${item.serviceType}</strong>
+          </button>
           <span class="meta">${item.category}</span>
         </div>
         ${statusPill(item.displayStatus, item.displayBadgeText)}
@@ -4882,6 +5093,9 @@ function serviceScheduleMarkup(item) {
         <span class="meta">${item.reminderLogic || "Shows due based on the saved mileage and/or month interval."}</span>
       </div>
       <div class="schedule-card-actions">
+        <button class="button-primary" type="button" data-log-recurring-plan="${item.planKey}">
+          Log service
+        </button>
         <button class="button-secondary" type="button" data-edit-recurring-plan="${item.planKey}">
           Edit plan
         </button>
@@ -4905,11 +5119,10 @@ function initializeCustomSchedulePlan() {
   editingSchedulePlanKey = null;
   schedulePlanForm.reset();
   schedulePlanForm.elements.planId.value = "";
-  schedulePlanForm.elements.serviceKey.value = "";
-  schedulePlanForm.elements.isCustom.value = "true";
+  clearSchedulePlanServiceSelection();
   schedulePlanForm.elements.vehicleId.value = getActiveScheduleVehicleId();
-  schedulePlanForm.elements.serviceName.readOnly = false;
   schedulePlanTitle.textContent = "Add Recurring Plan";
+  renderSchedulePlanServiceChecklist();
   updateSchedulePlanMode();
   setSchedulePlanExpanded(true);
 }
@@ -4918,17 +5131,13 @@ function loadSchedulePlanIntoForm(plan) {
   editingSchedulePlanKey = plan.planKey;
   schedulePlanForm.reset();
   schedulePlanForm.elements.planId.value = plan.id ?? "";
-  schedulePlanForm.elements.serviceKey.value = plan.serviceKey ?? "";
-  schedulePlanForm.elements.isCustom.value = String(plan.isCustom);
   schedulePlanForm.elements.vehicleId.value = plan.vehicleId;
-  schedulePlanForm.elements.serviceName.value = plan.serviceName;
-  schedulePlanForm.elements.category.value = plan.category;
   schedulePlanForm.elements.intervalType.value = plan.intervalType;
   schedulePlanForm.elements.repeatMiles.value = plan.repeatMiles ?? "";
   schedulePlanForm.elements.repeatMonths.value = plan.repeatMonths ?? "";
   schedulePlanForm.elements.description.value = plan.description ?? "";
   schedulePlanForm.elements.reminderLogic.value = plan.reminderLogic ?? "";
-  schedulePlanForm.elements.serviceName.readOnly = !plan.isCustom;
+  setSchedulePlanSelectedService(resolvePlanServiceDefinition(plan));
   schedulePlanTitle.textContent = `Edit ${plan.serviceName}`;
   updateSchedulePlanMode();
   setSchedulePlanExpanded(true);
@@ -4946,11 +5155,10 @@ function resetSchedulePlanMode() {
   editingSchedulePlanKey = null;
   schedulePlanForm.reset();
   schedulePlanForm.elements.planId.value = "";
-  schedulePlanForm.elements.serviceKey.value = "";
-  schedulePlanForm.elements.isCustom.value = "";
+  clearSchedulePlanServiceSelection();
   schedulePlanForm.elements.vehicleId.value = getActiveScheduleVehicleId();
-  schedulePlanForm.elements.serviceName.readOnly = false;
   schedulePlanTitle.textContent = "Add Recurring Plan";
+  renderSchedulePlanServiceChecklist();
   setSchedulePlanExpanded(false);
   updateSchedulePlanMode();
 }
@@ -5001,9 +5209,11 @@ function getCanonicalServiceType(serviceName) {
 }
 
 function createDefaultRecurringPlan(vehicleId, template) {
+  const serviceDefinition = getServiceDefinition(template.serviceName);
   return {
     id: `${vehicleId}:${template.key}`,
     vehicleId,
+    serviceId: serviceDefinition?.id ?? `builtin:${normalizeServiceLookupKey(template.serviceName)}`,
     serviceKey: template.key,
     serviceName: template.serviceName,
     category: template.category,
@@ -5046,12 +5256,87 @@ function getDisplayRecurringPlans(vehicleId) {
   return [...templatePlans, ...customPlans];
 }
 
-function getRecurringPlanByKey(planKey) {
-  const vehicleId = getActiveScheduleVehicleId();
+function getRecurringPlanByKey(planKey, vehicleId = getActiveScheduleVehicleId()) {
   return getDisplayRecurringPlans(vehicleId).find((plan) => plan.planKey === cleanText(planKey)) ?? null;
 }
 
-function getExistingRecurringPlanForService(vehicleId, serviceType) {
+function getRecurringPlanById(planId, vehicleId) {
+  const normalizedPlanId = cleanText(planId);
+  if (!normalizedPlanId) {
+    return null;
+  }
+
+  return getDisplayRecurringPlans(vehicleId).find((plan) => plan.id === normalizedPlanId) ?? null;
+}
+
+function getLinkedPlanDisplayName(record) {
+  if (!record.linkedPlanId) {
+    return null;
+  }
+
+  const plan = getRecurringPlanById(record.linkedPlanId, record.vehicleId);
+  return plan?.serviceName ?? null;
+}
+
+function buildLinkedPlanMarkup(record) {
+  const label = getLinkedPlanDisplayName(record);
+  return label ? `<span class="meta">Linked plan: ${label}</span>` : "";
+}
+
+function openPlanServiceLog(planKey) {
+  const plan = getRecurringPlanByKey(planKey);
+  if (!plan) {
+    return;
+  }
+
+  loadPlanIntoRecordForm(plan);
+}
+
+function loadPlanIntoRecordForm(plan) {
+  resetRecordFormMode();
+  const serviceDefinition = resolvePlanServiceDefinition(plan);
+  recordForm.dataset.linkedPlanId = plan.id;
+  if (serviceDefinition?.id) {
+    recordForm.dataset.serviceId = serviceDefinition.id;
+  }
+  syncActiveVehicle(plan.vehicleId);
+
+  const vehicle = state.vehicles.find((item) => item.id === plan.vehicleId);
+  recordForm.elements.vehicleId.value = plan.vehicleId;
+  recordForm.elements.serviceDate.value = new Date().toISOString().slice(0, 10);
+  recordForm.elements.serviceMileage.value =
+    typeof vehicle?.currentMileage === "number" ? vehicle.currentMileage : "";
+  recordForm.elements.cost.value = "";
+  recordForm.elements.shop.value = "";
+  recordForm.elements.notes.value = "Logged from maintenance plan";
+  setRecordCategoryValue(
+    serviceDefinition?.category || plan.category || getServiceCategory(plan.serviceName),
+    { manual: true }
+  );
+  recordForm.elements.serviceType.value = serviceDefinition?.name || plan.serviceName;
+  recordCustomServiceInput.value = "";
+  checkServiceTypes([serviceDefinition?.name || plan.serviceName]);
+  renderRecordServiceChecklist();
+  syncRecordTireSection();
+  syncRecordTirePositionMode();
+  updateRecordFormMode();
+  setActiveScreen("history");
+  setRecordFormExpanded(true);
+  requestAnimationFrame(() => {
+    recordFormPanel?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+}
+
+function getExistingRecurringPlanForService(vehicleId, serviceType, serviceId = null) {
+  if (serviceId) {
+    const planByServiceId = state.recurringPlans.find(
+      (plan) => plan.vehicleId === vehicleId && plan.serviceId === serviceId
+    );
+    if (planByServiceId) {
+      return planByServiceId;
+    }
+  }
+
   const normalizedServiceType = normalizeServiceLookupKey(serviceType);
   if (!normalizedServiceType) {
     return null;
@@ -5090,19 +5375,31 @@ function syncRecurringPlansFromLoggedServices(vehicleId, records) {
       return;
     }
 
-    const matchingTemplate = getRecurringTemplateByName(record.serviceType);
-    const existingPlan = getExistingRecurringPlanForService(vehicleId, record.serviceType);
+    const linkedPlan = record.linkedPlanId ? getRecurringPlanById(record.linkedPlanId, vehicleId) : null;
+    const planByServiceId = record.serviceId
+      ? getDisplayRecurringPlans(vehicleId).find((plan) => plan.serviceId === record.serviceId) ?? null
+      : null;
+    const matchingTemplate = linkedPlan?.serviceKey
+      ? getRecurringTemplateByKey(linkedPlan.serviceKey)
+      : planByServiceId?.serviceKey
+        ? getRecurringTemplateByKey(planByServiceId.serviceKey)
+        : getRecurringTemplateByName(record.serviceType);
+    const existingPlan =
+      linkedPlan ?? planByServiceId ?? getExistingRecurringPlanForService(vehicleId, record.serviceType, record.serviceId);
     const intervalType = getIntervalTypeFromRepeats(repeatMiles, repeatMonths);
     const canonicalServiceType = getCanonicalServiceType(record.serviceType);
+    const serviceDefinition = getServiceDefinitionById(record.serviceId) ?? getServiceDefinition(record.serviceType);
 
     const planPayload = matchingTemplate
       ? {
           ...createDefaultRecurringPlan(vehicleId, matchingTemplate),
           ...existingPlan,
+          id: existingPlan?.id ?? `${vehicleId}:${matchingTemplate.key}`,
           vehicleId,
+          serviceId: serviceDefinition?.id ?? existingPlan?.serviceId ?? null,
           serviceKey: matchingTemplate.key,
-          serviceName: matchingTemplate.serviceName,
-          category: getServiceCategory(canonicalServiceType),
+          serviceName: existingPlan?.serviceName ?? serviceDefinition?.name ?? matchingTemplate.serviceName,
+          category: existingPlan?.category ?? serviceDefinition?.category ?? getServiceCategory(canonicalServiceType),
           intervalType,
           repeatMiles,
           repeatMonths,
@@ -5115,9 +5412,10 @@ function syncRecurringPlansFromLoggedServices(vehicleId, records) {
       : {
           id: existingPlan?.id ?? crypto.randomUUID(),
           vehicleId,
+          serviceId: serviceDefinition?.id ?? existingPlan?.serviceId ?? null,
           serviceKey: existingPlan?.serviceKey || `custom:${normalizeServiceLookupKey(canonicalServiceType)}`,
-          serviceName: canonicalServiceType,
-          category: record.category || getServiceCategory(canonicalServiceType),
+          serviceName: existingPlan?.serviceName ?? serviceDefinition?.name ?? canonicalServiceType,
+          category: existingPlan?.category ?? serviceDefinition?.category ?? record.category ?? getServiceCategory(canonicalServiceType),
           intervalType,
           repeatMiles,
           repeatMonths,
@@ -5154,18 +5452,34 @@ function upsertRecurringPlan(planPayload) {
 
 function getLatestRecordForRecurringPlan(vehicleId, plan) {
   const matchNames = [plan.serviceName].concat(plan.aliases ?? []).map((name) => normalizeServiceLookupKey(name));
+
   return [...state.records]
-    .filter(
-      (record) => record.vehicleId === vehicleId && matchNames.includes(normalizeServiceLookupKey(record.serviceType))
-    )
-    .sort((a, b) => new Date(b.serviceDate) - new Date(a.serviceDate) || b.mileageAtService - a.mileageAtService)[0] ?? null;
+    .filter((record) => {
+      if (record.vehicleId !== vehicleId) {
+        return false;
+      }
+
+      if (record.linkedPlanId === plan.id) {
+        return true;
+      }
+
+      if (plan.serviceId && record.serviceId === plan.serviceId) {
+        return true;
+      }
+
+      return matchNames.includes(normalizeServiceLookupKey(record.serviceType));
+    })
+    .sort((a, b) => new Date(b.serviceDate) - new Date(a.serviceDate) || (b.mileageAtService ?? -1) - (a.mileageAtService ?? -1))[0] ?? null;
 }
 
 function buildRecurringPlanSummary(plan, vehicle) {
   const lastRecord = getLatestRecordForRecurringPlan(vehicle.id, plan);
   const repeatMiles = typeof plan.repeatMiles === "number" ? plan.repeatMiles : null;
   const repeatMonths = typeof plan.repeatMonths === "number" ? plan.repeatMonths : null;
-  const nextDueMileage = lastRecord && repeatMiles ? lastRecord.mileageAtService + repeatMiles : null;
+  const nextDueMileage =
+    lastRecord && repeatMiles && typeof lastRecord.mileageAtService === "number"
+      ? lastRecord.mileageAtService + repeatMiles
+      : null;
   const nextDueDate = lastRecord && repeatMonths ? addMonths(lastRecord.serviceDate, repeatMonths) : null;
   const milesDrivenSinceService =
     lastRecord && repeatMiles ? Math.max(vehicle.currentMileage - lastRecord.mileageAtService, 0) : null;
@@ -5240,7 +5554,11 @@ function buildRecurringPlanSummary(plan, vehicle) {
     defaultIntervalLabel: plan.defaultIntervalLabel || describePlanInterval(plan),
     activeIntervalLabel: describePlanInterval(plan),
     lastServiceLabel: lastRecord
-      ? `Last service: ${formatDate(lastRecord.serviceDate)} at ${formatNumber(lastRecord.mileageAtService)} miles`
+      ? `Last service: ${formatDate(lastRecord.serviceDate)}${
+          typeof lastRecord.mileageAtService === "number"
+            ? ` at ${formatNumber(lastRecord.mileageAtService)} miles`
+            : ""
+        }`
       : "Last service: not logged yet",
     nextDueLabel: buildNextDueLabel(nextDueMileage, nextDueDate, Boolean(lastRecord)),
   };
@@ -5340,6 +5658,8 @@ function renderServiceTypeOptions() {
     .sort((a, b) => a.localeCompare(b))
     .map((type) => `<option value="${type}"></option>`)
     .join("");
+  renderRecordServiceChecklist();
+  renderSchedulePlanServiceChecklist();
 }
 
 function seedCarfaxData() {
@@ -5446,13 +5766,14 @@ function seedCarfaxData() {
 }
 
 function carfaxTire(position, vehicleId, overrides) {
+  const internalId = overrides.id?.includes("placeholder") ? crypto.randomUUID() : overrides.id ?? crypto.randomUUID();
   const startingTreadDepth = typeof overrides.startingTreadDepth === "number" ? overrides.startingTreadDepth : null;
   const installMileage = overrides.installMileage ?? 0;
   const installDate = overrides.installDate || "";
 
   return {
-    id: overrides.id,
-    tireId: overrides.id,
+    id: internalId,
+    tireId: internalId,
     vehicleId,
     position,
     brand: "",
@@ -5466,7 +5787,7 @@ function carfaxTire(position, vehicleId, overrides) {
       typeof startingTreadDepth === "number"
         ? [
             {
-              tireId: overrides.id,
+              tireId: internalId,
               depth: startingTreadDepth,
               mileage: installMileage,
               date: installDate,
@@ -5943,9 +6264,13 @@ function sampleTire(position, installMileage) {
 }
 
 function syncVehicleMileage(vehicleId, mileage) {
+  if (typeof mileage !== "number" || !Number.isFinite(mileage)) {
+    return;
+  }
   const vehicle = state.vehicles.find((item) => item.id === vehicleId);
   if (vehicle && mileage > vehicle.currentMileage) {
     vehicle.currentMileage = mileage;
+    syncTireTreadRatings(vehicle);
   }
 }
 
@@ -6119,7 +6444,6 @@ function syncUiStateToState() {
   state.ui.expandedPanels = {
     vehicleForm: Boolean(isVehicleFormExpanded),
     recordForm: Boolean(isRecordFormExpanded),
-    historyQuickAdd: Boolean(isHistoryQuickAddExpanded),
     schedulePlan: Boolean(isSchedulePlanExpanded),
   };
   state.ui.filters = {
@@ -6156,7 +6480,6 @@ function restoreUiStateControls() {
   isTireTrackerExpanded = uiState.tireTrackerExpanded;
   isVehicleFormExpanded = uiState.expandedPanels.vehicleForm;
   isRecordFormExpanded = uiState.expandedPanels.recordForm;
-  isHistoryQuickAddExpanded = uiState.expandedPanels.historyQuickAdd;
   isSchedulePlanExpanded = uiState.expandedPanels.schedulePlan;
 
   if (historySearchInput) {
@@ -6182,9 +6505,8 @@ function restoreUiStateControls() {
   vehicleFormPanel?.classList.toggle("is-hidden", !isVehicleFormExpanded);
   vehicleFormToggleButton?.setAttribute("aria-expanded", String(isVehicleFormExpanded));
   recordFormPanel?.classList.toggle("is-hidden", !isRecordFormExpanded);
+  recordFormToggleButton?.classList.toggle("is-hidden", isRecordFormExpanded);
   recordFormToggleButton?.setAttribute("aria-expanded", String(isRecordFormExpanded));
-  historyQuickAddPanel?.classList.toggle("is-hidden", !isHistoryQuickAddExpanded);
-  historyQuickAddToggleButton?.setAttribute("aria-expanded", String(isHistoryQuickAddExpanded));
   schedulePlanPanel?.classList.toggle("is-hidden", !isSchedulePlanExpanded);
   schedulePlanToggleButton?.setAttribute("aria-expanded", String(isSchedulePlanExpanded));
   isRestoringUiState = false;
@@ -6207,30 +6529,22 @@ function normalizeVehicleTireData(vehicle) {
   TIRE_POSITIONS.forEach((position) => {
     const tire = nextVehicle.tires[position.key];
     if (!tire) {
+      nextVehicle[getActiveTireIdKey(position.key)] = null;
       return;
     }
 
     nextVehicle.tires[position.key] = normalizeTireRecord(tire, nextVehicle.id, position.key);
+    nextVehicle[getActiveTireIdKey(position.key)] =
+      nextVehicle.tires[position.key].tireId ?? nextVehicle.tires[position.key].id ?? null;
   });
+
+  syncTireTreadRatings(nextVehicle);
 
   return nextVehicle;
 }
 
 function normalizeTireRecord(tire, vehicleId, positionKey) {
-  const startingTreadDepth = normalizeTreadRating(
-    typeof tire.startingTreadDepth === "number"
-      ? tire.startingTreadDepth
-      : typeof tire.treadDepth === "number"
-        ? tire.treadDepth
-        : tire.treadHistory?.[tire.treadHistory.length - 1]?.depth ?? null
-  );
-  const currentTreadDepth = normalizeTreadRating(
-    typeof tire.currentTreadDepth === "number"
-      ? tire.currentTreadDepth
-      : typeof tire.treadDepth === "number"
-        ? tire.treadDepth
-        : tire.treadHistory?.[0]?.depth ?? null
-  );
+  const startingTreadDepth = getStartingTreadRating(tire);
 
   return {
     ...tire,
@@ -6239,8 +6553,10 @@ function normalizeTireRecord(tire, vehicleId, positionKey) {
     vehicleId: tire.vehicleId ?? vehicleId,
     position: positionKey,
     startingTreadDepth,
-    currentTreadDepth,
-    treadDepth: currentTreadDepth,
+    currentTreadDepth:
+      typeof tire.currentTreadDepth === "number" ? roundTreadRating(tire.currentTreadDepth) : startingTreadDepth,
+    treadDepth:
+      typeof tire.currentTreadDepth === "number" ? roundTreadRating(tire.currentTreadDepth) : startingTreadDepth,
     status: tire.status || "active",
     treadHistory: Array.isArray(tire.treadHistory)
       ? tire.treadHistory.map((entry) => {
@@ -6394,18 +6710,69 @@ function normalizeServiceLookupKey(serviceName) {
     .trim();
 }
 
+function migrateServiceAndPlanLinks() {
+  let didMigrate = false;
+
+  state.recurringPlans = state.recurringPlans.map((plan) => {
+    if (plan.serviceId && getServiceDefinitionById(plan.serviceId)) {
+      return plan;
+    }
+
+    const definition = getServiceDefinition(plan.serviceName);
+    if (!definition) {
+      return plan;
+    }
+
+    didMigrate = true;
+    return {
+      ...plan,
+      serviceId: definition.id,
+      serviceName: definition.name,
+      category: plan.category || definition.category,
+    };
+  });
+
+  state.records = state.records.map((record) => {
+    if (record.serviceId && getServiceDefinitionById(record.serviceId)) {
+      return record;
+    }
+
+    const definition = getServiceDefinition(record.serviceType);
+    if (!definition) {
+      return record;
+    }
+
+    didMigrate = true;
+    return {
+      ...record,
+      serviceId: definition.id,
+    };
+  });
+
+  if (didMigrate) {
+    persist();
+  }
+}
+
 function repairCanonicalServiceNames() {
   let didRepair = false;
 
   state.records = state.records.map((record) => {
     const canonicalServiceType = getCanonicalServiceType(record.serviceType);
+    const serviceDefinition = getServiceDefinition(canonicalServiceType);
     const canonicalCategory = record.category || getServiceCategory(canonicalServiceType);
-    if (canonicalServiceType !== record.serviceType || canonicalCategory !== record.category) {
+    const nextServiceId = record.serviceId || serviceDefinition?.id || null;
+    if (
+      canonicalServiceType !== record.serviceType ||
+      canonicalCategory !== record.category ||
+      nextServiceId !== record.serviceId
+    ) {
       didRepair = true;
       return {
         ...record,
         serviceType: canonicalServiceType,
         category: canonicalCategory,
+        serviceId: nextServiceId,
       };
     }
     return record;
@@ -6439,66 +6806,142 @@ function hideRecordTireSection() {
   }
 }
 
-function isTireRelatedService(serviceType) {
-  return /(tire|wheel|alignment)/i.test(cleanText(serviceType));
+function isTireReplacementService(serviceType) {
+  return /tire replacement/i.test(cleanText(serviceType));
 }
 
-function buildVisitTireUpdate({ vehicleId, installDate, installMileage, shop, notes }) {
-  const positions = [...recordForm.querySelectorAll('input[name="recordTirePositions"]:checked')].map(
-    (input) => input.value
-  );
+function getTireReplacementPositions(tireDetails) {
+  if (!tireDetails) {
+    return [];
+  }
 
+  if (tireDetails.position === "multiple") {
+    return (tireDetails.positions || []).filter(Boolean);
+  }
+
+  if (tireDetails.position && tireDetails.position !== "multiple") {
+    return [tireDetails.position];
+  }
+
+  return [];
+}
+
+function tireReplacementDetailsChanged(before, after) {
+  return JSON.stringify(before ?? null) !== JSON.stringify(after ?? null);
+}
+
+function revertTireReplacementFromService(vehicle, record) {
+  if (!record?.id) {
+    return;
+  }
+
+  TIRE_POSITIONS.forEach(({ key: position }) => {
+    const activeTire = vehicle.tires?.[position];
+    if (activeTire?.sourceLogId !== record.id) {
+      return;
+    }
+
+    const archivedIndex = (vehicle.archivedTires || []).findIndex((archivedTire) =>
+      archivedTire.replacementHistory?.some(
+        (entry) =>
+          entry.newTireId === (activeTire.tireId || activeTire.id) &&
+          entry.replacedPosition === position &&
+          (entry.sourceLogId === record.id || entry.date === record.serviceDate)
+      )
+    );
+
+    if (archivedIndex >= 0) {
+      const restored = vehicle.archivedTires.splice(archivedIndex, 1)[0];
+      restored.status = "active";
+      const currentPosition = restored.positionHistory?.[0];
+      if (currentPosition) {
+        currentPosition.toDate = null;
+        currentPosition.toMileage = null;
+      }
+      setActiveTireForPosition(vehicle, position, restored);
+      return;
+    }
+
+    setActiveTireForPosition(vehicle, position, null);
+  });
+}
+
+function applyTireReplacementFromService(vehicle, record) {
+  const tireDetails = record.tireDetails;
+  const positions = getTireReplacementPositions(tireDetails);
   if (!positions.length) {
-    return null;
-  }
-
-  const brand = cleanText(recordForm.elements.recordTireBrand.value);
-  const model = cleanText(recordForm.elements.recordTireModel.value);
-  const type = cleanText(recordForm.elements.recordTireType.value);
-
-  if (!brand || !model || !type) {
-    alert("Add tire brand, model, and type when replacing tires from the service form.");
-    return false;
-  }
-
-  return {
-    vehicleId,
-    positions,
-    brand,
-    model,
-    type,
-    size: cleanText(recordForm.elements.recordTireSize.value),
-    treadDepth: parseTreadRatingInput(recordForm.elements.recordTireTreadDepth.value),
-    warrantyMiles: numericOrNull(recordForm.elements.recordTireWarrantyMiles.value),
-    estimatedReplacementMileage: numericOrNull(
-      recordForm.elements.recordTireEstimatedReplacementMileage.value
-    ),
-    recommendedPressure: numericOrNull(recordForm.elements.recordTireRecommendedPressure.value),
-    installDate,
-    installMileage,
-    installer: cleanText(recordForm.elements.recordTireInstaller.value) || shop,
-    notes: mergeNotes(notes, cleanText(recordForm.elements.recordTireNotes.value)),
-  };
-}
-
-function saveVisitTireUpdate(tireUpdate) {
-  const vehicle = state.vehicles.find((item) => item.id === tireUpdate.vehicleId);
-  if (!vehicle) {
     return;
   }
 
   if (!vehicle.tires) {
     vehicle.tires = {};
   }
+  if (!vehicle.archivedTires) {
+    vehicle.archivedTires = [];
+  }
 
-  tireUpdate.positions.forEach((position) => {
-    vehicle.tires[position] = {
-      id: crypto.randomUUID(),
+  const treadDepth = normalizeTreadRating(tireDetails.treadDepth);
+
+  positions.forEach((position) => {
+    const existingTire = getActiveTireForPosition(vehicle, position);
+    let archivedTire = null;
+
+    if (existingTire?.tireId || existingTire?.id) {
+      archivedTire = archiveReplacedTire(vehicle, position, existingTire, {
+        date: record.serviceDate,
+        mileage: record.mileageAtService,
+        reason: "Tire replacement",
+        shop: cleanText(record.shop),
+        cost: record.cost,
+        notes: tireDetails.notes,
+        sourceLogId: record.id,
+      });
+    }
+
+    const newTire = createReplacementTireRecord({
+      vehicleId: vehicle.id,
       position,
-      ...tireUpdate,
-      updatedAt: new Date().toISOString(),
-    };
+      brand: tireDetails.brand,
+      model: tireDetails.model,
+      type: tireDetails.type,
+      size: tireDetails.size,
+      treadDepth,
+      warrantyMiles: tireDetails.warrantyMiles,
+      estimatedReplacementMileage: tireDetails.estimatedReplacementMileage,
+      recommendedPressure: tireDetails.recommendedPressure,
+      installDate: record.serviceDate,
+      installMileage: record.mileageAtService,
+      installer: cleanText(record.shop),
+      notes: mergeNotes(tireDetails.notes, record.notes),
+      sourceLogId: record.id,
+    });
+
+    if (archivedTire?.replacementHistory?.length) {
+      archivedTire.replacementHistory[archivedTire.replacementHistory.length - 1].newTireId = newTire.tireId;
+    }
+
+    const mileageLabel =
+      typeof record.mileageAtService === "number" ? ` at ${formatNumber(record.mileageAtService)} mi` : "";
+    newTire.replacementHistory = [
+      {
+        date: record.serviceDate,
+        mileage: record.mileageAtService,
+        replacedPosition: position,
+        replacementReason: `Replaced on ${formatDate(record.serviceDate)}${mileageLabel}`,
+        shop: cleanText(record.shop),
+        notes: mergeNotes(tireDetails.notes, `Installed at ${getTirePositionLabel(position)}`),
+        sourceLogId: record.id,
+      },
+    ];
+
+    setActiveTireForPosition(vehicle, position, newTire);
   });
+
+  syncTireTreadRatings(vehicle);
+}
+
+function isTireRelatedService(serviceType) {
+  return /(tire|wheel|alignment)/i.test(cleanText(serviceType));
 }
 
 function numericOrNull(value) {

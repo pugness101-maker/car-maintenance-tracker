@@ -476,6 +476,12 @@ select:focus {
   margin-bottom: 18px;
 }
 
+.history-add-action {
+  display: flex;
+  justify-content: flex-start;
+  margin: 4px 0 18px;
+}
+
 .history-top-actions {
   display: flex;
   justify-content: space-between;
@@ -989,6 +995,33 @@ select:focus {
 .schedule-card {
   display: grid;
   gap: 12px;
+}
+
+.schedule-card-interactive {
+  cursor: pointer;
+}
+
+.schedule-service-link {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.schedule-service-link strong {
+  text-decoration: underline;
+  text-decoration-color: rgba(12, 108, 103, 0.35);
+  text-underline-offset: 3px;
+}
+
+.schedule-service-link:hover strong,
+.schedule-service-link:focus-visible strong {
+  color: var(--primary-deep);
 }
 
 .schedule-toggle-row {
